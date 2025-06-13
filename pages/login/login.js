@@ -21,13 +21,12 @@ Page({
 
         // 登录微信获取openid
         app.login()
-            .then(openid => {
-                // 获取用户信息
-                return this.getUserProfile()
-            })
             .then(userInfo => {
-                // 保存用户信息
-                app.saveUserInfo(userInfo)
+                // 登录成功，显示提示
+                wx.showToast({
+                    title: '登录成功',
+                    icon: 'success'
+                })
 
                 // 返回上一页
                 this.navigateBack()
@@ -35,26 +34,7 @@ Page({
             .catch(err => {
                 console.error('登录失败', err)
                 this.setData({ isLoading: false })
-                wx.showToast({
-                    title: '登录失败',
-                    icon: 'none'
-                })
             })
-    },
-
-    // 获取用户信息
-    getUserProfile: function () {
-        return new Promise((resolve, reject) => {
-            wx.getUserProfile({
-                desc: '用于完善个人资料',
-                success: (res) => {
-                    resolve(res.userInfo)
-                },
-                fail: (err) => {
-                    reject(err)
-                }
-            })
-        })
     },
 
     // 返回上一页

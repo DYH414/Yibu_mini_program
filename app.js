@@ -12,7 +12,7 @@ App({
         }
 
         // 获取用户信息
-        this.getLoginStatus();
+        this.checkLoginStatus();
     },
 
     // 全局数据
@@ -23,20 +23,39 @@ App({
     },
 
     // 获取登录状态
-    getLoginStatus: function () {
-        const userInfo = wx.getStorageSync('userInfo');
+    checkLoginStatus: function () {
         const openid = wx.getStorageSync('openid');
 
-        if (userInfo && openid) {
-            this.globalData.userInfo = userInfo;
-            this.globalData.isLogin = true;
-            this.globalData.openid = openid;
+        if (openid) {
+            // 已登录，获取用户信息
+            const db = wx.cloud.database();
+            db.collection('users').doc(openid).get({
+                success: res => {
+                    this.globalData.userInfo = res.data;
+                    this.globalData.isLogin = true;
+                    this.globalData.openid = openid;
+
+                    // 如果有回调函数，执行回调
+                    if (this.userInfoReadyCallback) {
+                        this.userInfoReadyCallback(res.data);
+                    }
+                },
+                fail: () => {
+                    // 获取失败，清除openid
+                    wx.removeStorageSync('openid');
+                    this.globalData.isLogin = false;
+                }
+            });
         }
     },
 
     // 登录方法
     login: function () {
         return new Promise((resolve, reject) => {
+            wx.showLoading({
+                title: '登录中...',
+            });
+
             wx.login({
                 success: res => {
                     // 调用云函数获取openid
@@ -44,19 +63,45 @@ App({
                         name: 'login',
                         data: {},
                         success: result => {
+                            wx.hideLoading();
+
                             const openid = result.result.openid;
                             this.globalData.openid = openid;
                             wx.setStorageSync('openid', openid);
-                            resolve(openid);
+
+                            // 判断是新用户还是老用户
+                            if (result.result.isNew) {
+                                // 新用户，使用默认信息
+                                this.globalData.userInfo = {
+                                    nickname: '微信用户',
+                                    avatarUrl: '/images/default-avatar.png'
+                                };
+                            } else {
+                                // 老用户，使用已有信息
+                                this.globalData.userInfo = result.result.user;
+                            }
+
+                            this.globalData.isLogin = true;
+                            resolve(this.globalData.userInfo);
                         },
                         fail: err => {
+                            wx.hideLoading();
                             console.error('云函数调用失败', err);
+                            wx.showToast({
+                                title: '登录失败',
+                                icon: 'none'
+                            });
                             reject(err);
                         }
                     });
                 },
                 fail: err => {
+                    wx.hideLoading();
                     console.error('微信登录失败', err);
+                    wx.showToast({
+                        title: '登录失败',
+                        icon: 'none'
+                    });
                     reject(err);
                 }
             });
