@@ -1,0 +1,44 @@
+<!-- 登录页 -->
+<view class="container">
+  <view class="logo-area">
+    <image class="logo" src="/images/logo.png"></image>
+    <text class="app-name">一布校园外卖聚合</text>
+  </view>
+
+  <view class="info-text">
+    <text>登录后，您可以：</text>
+    <view class="feature-list">
+      <view class="feature-item">
+        <image class="feature-icon" src="/images/icons/star.png"></image>
+        <text>对商家进行评分</text>
+      </view>
+      <view class="feature-item">
+        <image class="feature-icon" src="/images/icons/comment.png"></image>
+        <text>发表评论</text>
+      </view>
+      <view class="feature-item">
+        <image class="feature-icon" src="/images/icons/like.png"></image>
+        <text>点赞评论</text>
+      </view>
+      <view class="feature-item">
+        <image class="feature-icon" src="/images/icons/favorite.png"></image>
+        <text>收藏商家</text>
+      </view>
+    </view>
+  </view>
+
+  <button 
+    class="login-btn" 
+    type="primary" 
+    bindtap="handleLogin"
+    loading="{{isLoading}}">
+    微信一键登录
+  </button>
+
+  <view class="privacy-policy">
+    <text>登录即表示您同意</text>
+    <text class="link">《用户协议》</text>
+    <text>和</text>
+    <text class="link">《隐私政策》</text>
+  </view>
+</view> 

@@ -1,0 +1,68 @@
+<!-- index.wxml -->
+<view class="container">
+  <!-- 分类导航 -->
+  <scroll-view class="category-scroll" scroll-x enable-flex scroll-with-animation>
+    <view class="category-list">
+      <view 
+        class="category-item {{currentCategory === item.id ? 'active' : ''}}" 
+        wx:for="{{categories}}" 
+        wx:key="id"
+        bindtap="switchCategory"
+        data-id="{{item.id}}">
+        <image class="category-icon" src="{{item.icon}}" mode="aspectFill"></image>
+        <text class="category-name">{{item.name}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 排序选项 -->
+  <view class="sort-bar">
+    <view class="sort-item {{sortBy === 'default' ? 'active' : ''}}" bindtap="switchSort" data-sort="default">
+      <text>默认排序</text>
+    </view>
+    <view class="sort-item {{sortBy === 'rating' ? 'active' : ''}}" bindtap="switchSort" data-sort="rating">
+      <text>按评分</text>
+    </view>
+  </view>
+
+  <!-- 商家列表 -->
+  <view class="merchant-list">
+    <block wx:if="{{!loading && merchants.length > 0}}">
+      <view 
+        class="merchant-card" 
+        wx:for="{{merchants}}" 
+        wx:key="_id"
+        bindtap="goToMerchantDetail"
+        data-id="{{item._id}}">
+        <view class="merchant-logo">
+          <image src="{{item.logoUrl}}" mode="aspectFill"></image>
+        </view>
+        <view class="merchant-info">
+          <view class="merchant-name ellipsis">{{item.name}}</view>
+          <view class="merchant-rating">
+            <view class="rate">
+              <block wx:for="{{5}}" wx:key="*this" wx:for-item="starIndex">
+                <image 
+                  class="rate-star" 
+                  src="/images/stars/{{starIndex < Math.floor(item.avgRating) ? 'star-full.png' : (starIndex < Math.ceil(item.avgRating) ? 'star-half.png' : 'star-empty.png')}}">
+                </image>
+              </block>
+              <text class="rating-text">{{item.avgRating}} ({{item.ratingCount}})</text>
+            </view>
+          </view>
+          <view class="merchant-desc ellipsis-2">{{item.description}}</view>
+        </view>
+      </view>
+    </block>
+
+    <!-- 空状态 -->
+    <view wx:if="{{!loading && merchants.length === 0}}" class="empty-state">
+      <text>暂无相关商家</text>
+    </view>
+
+    <!-- 加载状态 -->
+    <view wx:if="{{loading}}" class="loading-state">
+      <text>加载中...</text>
+    </view>
+  </view>
+</view> 

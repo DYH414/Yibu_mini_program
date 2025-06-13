@@ -1,0 +1,183 @@
+/* 我的页面样式 */
+.container {
+  padding: 24rpx;
+}
+
+/* 用户头部 */
+.user-header {
+  padding: 40rpx 30rpx;
+  margin-bottom: 30rpx;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.user-avatar, .default-avatar {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 60rpx;
+  margin-right: 20rpx;
+}
+
+.user-name {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.user-stats {
+  display: flex;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 30rpx;
+}
+
+.stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-count {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8rpx;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #999;
+}
+
+/* 未登录状态 */
+.not-login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20rpx 0;
+}
+
+.login-tip {
+  font-size: 28rpx;
+  color: #666;
+  margin: 20rpx 0 30rpx;
+}
+
+.login-btn {
+  width: 240rpx;
+  height: 70rpx;
+  line-height: 70rpx;
+  font-size: 28rpx;
+  border-radius: 35rpx;
+  background-color: #FF6B6B !important;
+  color: #fff;
+}
+
+/* 收藏列表 */
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin: 30rpx 0 20rpx;
+  padding-left: 10rpx;
+}
+
+.favorite-item {
+  margin-bottom: 20rpx;
+  padding: 24rpx;
+  display: flex;
+  flex-direction: column;
+}
+
+.favorite-content {
+  display: flex;
+  margin-bottom: 20rpx;
+}
+
+.merchant-logo {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 8rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.merchant-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.merchant-name {
+  font-size: 30rpx;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 10rpx;
+}
+
+.merchant-desc {
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.4;
+}
+
+.favorite-actions {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 20rpx;
+}
+
+.cancel-btn {
+  display: inline-block;
+  padding: 12rpx 24rpx;
+  font-size: 26rpx;
+  color: #999;
+  background-color: #f5f5f5;
+  border-radius: 30rpx;
+}
+
+/* 操作列表 */
+.action-list {
+  margin-top: 30rpx;
+}
+
+.action-item {
+  height: 100rpx;
+  display: flex;
+  align-items: center;
+  padding: 0 30rpx;
+  font-size: 30rpx;
+  color: #333;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.action-item:last-child {
+  border-bottom: none;
+}
+
+.logout {
+  color: #FF6B6B;
+}
+
+/* 空状态与加载状态 */
+.empty-state, .loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300rpx;
+  color: #999;
+  font-size: 28rpx;
+}
+
+.empty-icon {
+  width: 120rpx;
+  height: 120rpx;
+  margin-bottom: 20rpx;
+  opacity: 0.5;
+} 

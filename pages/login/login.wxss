@@ -1,0 +1,84 @@
+/* 登录页样式 */
+.container {
+  padding: 60rpx 40rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+}
+
+.logo-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 60rpx;
+}
+
+.logo {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 24rpx;
+  margin-bottom: 20rpx;
+}
+
+.app-name {
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.info-text {
+  width: 100%;
+  margin-bottom: 60rpx;
+}
+
+.info-text > text {
+  font-size: 30rpx;
+  color: #666;
+  display: block;
+  margin-bottom: 30rpx;
+}
+
+.feature-list {
+  padding: 0 20rpx;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.feature-icon {
+  width: 36rpx;
+  height: 36rpx;
+  margin-right: 16rpx;
+}
+
+.feature-item text {
+  font-size: 28rpx;
+  color: #666;
+}
+
+.login-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+  background-color: #FF6B6B !important;
+  margin-bottom: 40rpx;
+}
+
+.privacy-policy {
+  font-size: 24rpx;
+  color: #999;
+  text-align: center;
+}
+
+.link {
+  color: #FF6B6B;
+  display: inline;
+} 

@@ -1,0 +1,67 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# campus-food-aggregator
+
+## project-overview
+this is a wechat mini program built for university students to aggregate all local food delivery services into one platform. the goal is to reduce the friction of switching between multiple delivery mini-programs and expose more available vendors.
+
+## core-features
+- category-based homepage
+- vendor list with ratings, logos and platform jump options
+- vendor detail page with rating, commenting and platform links
+- user login using wechat official wx.login
+- only logged-in users can rate, comment, like, collect
+- all actions are stored in cloud database using cloudbase
+
+## collections-schema
+- merchants
+  - name
+  - logoUrl
+  - description
+  - category
+  - platforms: [ { name, appId, iconUrl } ]
+  - createTime
+
+- ratings
+  - merchantId
+  - userOpenId
+  - score (1~5)
+  - timestamp
+
+- comments
+  - merchantId
+  - userOpenId
+  - content
+  - likes
+  - likedBy (openid array)
+  - timestamp
+
+- favorites
+  - merchantId
+  - userOpenId
+  - timestamp
+
+- users
+  - _id = user openid
+  - nickname
+  - avatarUrl
+  - createTime
+
+- optional:
+  - search_logs
+  - like_logs
+
+## design-rules
+- homepage must show category selector + vendor cards
+- click a vendor card → navigate to vendor detail page
+- allow platform jumping through appId
+- users can rate and comment only once per merchant
+- users can like a comment only once
+- sort comments by likes
+- use wechat login for user authentication
+- do not generate placeholder images or auto-mock icons
+- when image is needed (for example merchant logo or platform icon), notify user to upload the file manually
+
