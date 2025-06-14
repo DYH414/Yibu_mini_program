@@ -3,7 +3,10 @@
         "pages/index/index",
         "pages/merchant/detail",
         "pages/mine/mine",
-        "pages/login/login"
+        "pages/login/login",
+        "pages/userEdit/userEdit",
+        "pages/admin/admin",
+        "pages/admin/fix-category"
     ],
     "window": {
         "backgroundTextStyle": "light",

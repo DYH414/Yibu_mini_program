@@ -18,8 +18,14 @@ Page({
     },
 
     onShow: function () {
-        // 每次显示页面时检查登录状态
-        this.checkLoginStatus()
+        console.log('我的页面显示')
+        // 每次显示页面时强制刷新用户信息
+        if (app.globalData.isLogin && app.globalData.openid) {
+            this.fetchLatestUserInfo()
+        } else {
+            // 检查登录状态
+            this.checkLoginStatus()
+        }
 
         // 如果已登录，加载用户数据
         if (this.data.isLogin) {
@@ -27,10 +33,43 @@ Page({
         }
     },
 
+    // 获取最新用户信息
+    fetchLatestUserInfo: function () {
+        const openid = app.globalData.openid
+        console.log('强制获取最新用户信息, openid:', openid)
+
+        wx.showLoading({ title: '加载中...' })
+
+        // 直接从数据库获取最新用户信息
+        db.collection('users').doc(openid).get({
+            success: res => {
+                console.log('获取最新用户信息成功:', res.data)
+
+                // 更新全局用户信息
+                app.globalData.userInfo = res.data
+                app.globalData.isLogin = true
+
+                // 更新页面数据
+                this.setData({
+                    userInfo: res.data,
+                    isLogin: true
+                })
+
+                wx.hideLoading()
+            },
+            fail: err => {
+                console.error('获取最新用户信息失败:', err)
+                wx.hideLoading()
+            }
+        })
+    },
+
     // 检查登录状态
     checkLoginStatus: function () {
         const isLogin = app.globalData.isLogin
         const userInfo = app.globalData.userInfo
+
+        console.log('我的页面检查登录状态:', isLogin, userInfo)
 
         this.setData({
             isLogin: isLogin,
@@ -45,6 +84,8 @@ Page({
         this.setData({ loading: true })
 
         const openid = app.globalData.openid
+        console.log('加载用户数据, openid:', openid)
+
         const tasks = [
             // 获取收藏数量和列表
             db.collection('favorites')
@@ -119,6 +160,13 @@ Page({
         const merchantId = e.currentTarget.dataset.id
         wx.navigateTo({
             url: `/pages/merchant/detail?id=${merchantId}`
+        })
+    },
+
+    // 跳转到编辑个人信息页面
+    goToEditProfile: function () {
+        wx.navigateTo({
+            url: '/pages/userEdit/userEdit'
         })
     },
 

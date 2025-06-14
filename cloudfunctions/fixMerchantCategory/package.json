@@ -1,0 +1,9 @@
+{
+    "name": "fixMerchantCategory",
+    "version": "1.0.0",
+    "description": "修复商家分类问题",
+    "main": "index.js",
+    "dependencies": {
+        "wx-server-sdk": "~2.6.3"
+    }
+}

@@ -1,0 +1,36 @@
+<view class="container">
+  <view class="header">
+    <text class="title">修复商家分类</text>
+  </view>
+
+  <view class="content">
+    <button class="fix-btn" bindtap="fixCategories" loading="{{loading}}" disabled="{{loading}}">
+      {{loading ? '修复中...' : '开始修复分类'}}
+    </button>
+
+    <view class="result" wx:if="{{result}}">
+      <view class="result-header">修复结果：</view>
+      
+      <view class="result-section">
+        <view class="section-title">成功修复 ({{result.results.success.length}})</view>
+        <view class="item" wx:for="{{result.results.success}}" wx:key="id">
+          <text>{{item.name}}: {{item.oldCategory}} → {{item.newCategory}}</text>
+        </view>
+      </view>
+
+      <view class="result-section">
+        <view class="section-title">无需修改 ({{result.results.unchanged.length}})</view>
+        <view class="item" wx:for="{{result.results.unchanged}}" wx:key="id">
+          <text>{{item.name}}: {{item.category}}</text>
+        </view>
+      </view>
+
+      <view class="result-section">
+        <view class="section-title">修复失败 ({{result.results.failed.length}})</view>
+        <view class="item" wx:for="{{result.results.failed}}" wx:key="id">
+          <text>{{item.name}}: {{item.category}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+</view> 

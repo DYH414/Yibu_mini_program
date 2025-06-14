@@ -1,0 +1,65 @@
+/* 用户编辑页面样式 */
+.container {
+  padding: 30rpx;
+}
+
+.header {
+  margin-bottom: 50rpx;
+}
+
+.title {
+  font-size: 36rpx;
+  font-weight: bold;
+}
+
+.form {
+  width: 100%;
+}
+
+.avatar-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 60rpx;
+}
+
+.avatar {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 50%;
+  margin-bottom: 20rpx;
+  border: 1px solid #eee;
+}
+
+.tip {
+  font-size: 24rpx;
+  color: #888;
+}
+
+.input-section {
+  margin-bottom: 40rpx;
+}
+
+.label {
+  display: block;
+  margin-bottom: 15rpx;
+  font-size: 28rpx;
+  color: #333;
+}
+
+.input {
+  width: 100%;
+  height: 80rpx;
+  border: 1rpx solid #ddd;
+  border-radius: 8rpx;
+  padding: 0 20rpx;
+  box-sizing: border-box;
+  font-size: 28rpx;
+}
+
+.save-btn {
+  margin-top: 60rpx;
+  width: 90%;
+  background-color: #FF6B6B !important;
+  font-size: 30rpx;
+} 

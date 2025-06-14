@@ -1,0 +1,35 @@
+<!-- 用户编辑页面 -->
+<view class="container">
+  <view class="header">
+    <text class="title">编辑个人资料</text>
+  </view>
+  
+  <view class="form">
+    <!-- 头像上传区域 -->
+    <view class="avatar-section">
+      <image 
+        class="avatar" 
+        src="{{avatarUrl}}" 
+        mode="aspectFill"
+        bindtap="chooseAvatar"></image>
+      <text class="tip">点击头像更换</text>
+    </view>
+    
+    <!-- 昵称输入区域 -->
+    <view class="input-section">
+      <text class="label">昵称</text>
+      <input 
+        class="input" 
+        value="{{nickname}}" 
+        bindinput="onInputNickname"
+        placeholder="请输入昵称" />
+    </view>
+  </view>
+  
+  <!-- 保存按钮 -->
+  <button 
+    class="save-btn" 
+    type="primary" 
+    loading="{{isLoading}}" 
+    bindtap="saveUserInfo">保存</button>
+</view> 

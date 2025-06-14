@@ -133,29 +133,34 @@ Page({
             .then(res => {
                 const comments = res.data
 
-                // 加载评论用户信息
-                const tasks = comments.map(comment => {
-                    return db.collection('users')
-                        .doc(comment.userOpenId)
-                        .get()
-                        .then(userRes => {
-                            comment.user = userRes.data || { nickname: '用户', avatarUrl: '/images/default-avatar.png' }
-                            // 当前用户是否点赞过
-                            comment.isLiked = comment.likedBy && comment.likedBy.includes(this.data.userOpenid)
-                            return comment
-                        })
-                        .catch(() => {
-                            comment.user = { nickname: '用户', avatarUrl: '/images/default-avatar.png' }
-                            return comment
-                        })
-                })
+                // 处理评论数据
+                const processedComments = comments.map(comment => {
+                    // 使用保存的用户信息，如果没有则使用默认值
+                    const user = {
+                        nickname: comment.userNickname || '用户',
+                        avatarUrl: comment.userAvatarUrl || '/images/default-avatar.png'
+                    };
 
-                Promise.all(tasks).then(updatedComments => {
-                    this.setData({
-                        comments: updatedComments,
-                        commentLoading: false
-                    })
-                })
+                    // 对于旧数据，可能没有保存用户信息，需要兼容处理
+                    if (!comment.userNickname && !comment.userAvatarUrl) {
+                        // 这里可以选择查询用户集合，但为了性能考虑，直接使用默认值
+                        // 后续新评论都会直接保存用户信息
+                    }
+
+                    // 当前用户是否点赞过
+                    const isLiked = comment.likedBy && comment.likedBy.includes(this.data.userOpenid);
+
+                    return {
+                        ...comment,
+                        user: user,
+                        isLiked: isLiked
+                    };
+                });
+
+                this.setData({
+                    comments: processedComments,
+                    commentLoading: false
+                });
             })
             .catch(err => {
                 console.error('获取评论失败', err)
@@ -289,10 +294,16 @@ Page({
 
         wx.showLoading({ title: '提交中...' })
 
+        // 获取用户信息
+        const userInfo = app.globalData.userInfo || {}
+
         db.collection('comments').add({
             data: {
                 merchantId: this.data.merchantId,
                 userOpenId: this.data.userOpenid,
+                // 直接保存用户昵称和头像，避免每次查询
+                userNickname: userInfo.nickname || '微信用户',
+                userAvatarUrl: userInfo.avatarUrl || '/images/default-avatar.png',
                 content: content,
                 likes: 0,
                 likedBy: [],

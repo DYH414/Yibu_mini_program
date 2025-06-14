@@ -1,0 +1,41 @@
+<!-- 管理员页面 -->
+<view class="container">
+  <view class="header">
+    <text class="title">管理员控制面板</text>
+  </view>
+  
+  <view class="content">
+    <block wx:if="{{isAdmin}}">
+      <button 
+        class="action-btn" 
+        bindtap="fixMerchantCategory" 
+        disabled="{{loading}}">
+        修复商家分类问题
+      </button>
+      
+      <view class="result-container" wx:if="{{result}}">
+        <view class="result-title">修复结果：</view>
+        <view class="result-item">
+          <text class="label">成功修复：</text>
+          <text class="value">{{result.results.success.length}} 个商家</text>
+        </view>
+        <view class="result-item">
+          <text class="label">无需修改：</text>
+          <text class="value">{{result.results.unchanged.length}} 个商家</text>
+        </view>
+        <view class="result-item">
+          <text class="label">修复失败：</text>
+          <text class="value">{{result.results.failed.length}} 个商家</text>
+        </view>
+      </view>
+    </block>
+    
+    <block wx:else>
+      <view class="unauthorized">
+        <text class="warning">您没有管理员权限</text>
+      </view>
+    </block>
+    
+    <button class="back-btn" bindtap="goToIndex">返回首页</button>
+  </view>
+</view> 
