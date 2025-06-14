@@ -33,9 +33,14 @@ App({
             db.collection('users').doc(openid).get({
                 success: res => {
                     console.log('获取用户信息成功:', res.data);
+
+                    // 确保使用最新的用户信息
                     this.globalData.userInfo = res.data;
                     this.globalData.isLogin = true;
                     this.globalData.openid = openid;
+
+                    // 更新本地存储中的用户信息
+                    wx.setStorageSync('userInfo', res.data);
 
                     // 如果有回调函数，执行回调
                     if (this.userInfoReadyCallback) {
@@ -46,7 +51,10 @@ App({
                     // 获取失败，清除openid
                     console.error('获取用户信息失败:', err);
                     wx.removeStorageSync('openid');
+                    wx.removeStorageSync('userInfo');
                     this.globalData.isLogin = false;
+                    this.globalData.userInfo = null;
+                    this.globalData.openid = null;
                 }
             });
         }
@@ -69,40 +77,25 @@ App({
                         success: result => {
                             console.log('云函数login调用成功, 结果:', result.result);
                             const openid = result.result.openid;
+                            const userData = result.result.user;
+
                             this.globalData.openid = openid;
                             wx.setStorageSync('openid', openid);
 
-                            // 强制直接从数据库获取最新用户信息，避免缓存问题
-                            const db = wx.cloud.database();
-                            console.log('准备查询用户数据, openid:', openid);
+                            // 如果云函数返回了用户数据，直接使用
+                            if (userData) {
+                                console.log('云函数返回的用户数据:', userData);
+                                this.globalData.userInfo = userData;
+                                this.globalData.isLogin = true;
+                                wx.setStorageSync('userInfo', userData);
 
-                            // 使用get方法的options参数，禁用缓存
-                            const options = {
-                                success: res => {
-                                    console.log('查询用户数据成功:', res.data);
-                                    this.globalData.userInfo = res.data;
-                                    this.globalData.isLogin = true;
-
-                                    wx.hideLoading();
-                                    resolve(this.globalData.userInfo);
-                                },
-                                fail: err => {
-                                    console.error('查询用户数据失败:', err);
-
-                                    // 使用默认信息
-                                    this.globalData.userInfo = {
-                                        nickname: '微信用户',
-                                        avatarUrl: '/images/default-avatar.png'
-                                    };
-                                    this.globalData.isLogin = true;
-
-                                    wx.hideLoading();
-                                    resolve(this.globalData.userInfo);
-                                }
-                            };
-
-                            // 直接调用get方法
-                            db.collection('users').doc(openid).get(options);
+                                wx.hideLoading();
+                                resolve(userData);
+                            } else {
+                                // 如果没有返回用户数据，从数据库获取
+                                console.log('云函数未返回用户数据，从数据库获取');
+                                this.fetchUserFromDB(openid, resolve, reject);
+                            }
                         },
                         fail: err => {
                             console.error('云函数login调用失败:', err);
@@ -125,6 +118,80 @@ App({
                     reject(err);
                 }
             });
+        });
+    },
+
+    // 从数据库获取用户信息
+    fetchUserFromDB: function (openid, resolve, reject) {
+        const db = wx.cloud.database();
+
+        db.collection('users').doc(openid).get({
+            success: res => {
+                console.log('从数据库获取用户信息成功:', res.data);
+                this.globalData.userInfo = res.data;
+                this.globalData.isLogin = true;
+                wx.setStorageSync('userInfo', res.data);
+
+                wx.hideLoading();
+                resolve(res.data);
+            },
+            fail: err => {
+                console.error('从数据库获取用户信息失败:', err);
+
+                // 创建默认用户信息
+                const defaultUserInfo = {
+                    _id: openid,
+                    nickname: '微信用户',
+                    avatarUrl: '/images/default-avatar.png'
+                };
+
+                // 尝试创建新用户
+                db.collection('users').add({
+                    data: {
+                        _id: openid,
+                        ...defaultUserInfo,
+                        createTime: db.serverDate()
+                    }
+                }).then(() => {
+                    console.log('创建新用户成功');
+                    this.globalData.userInfo = defaultUserInfo;
+                    this.globalData.isLogin = true;
+                    wx.setStorageSync('userInfo', defaultUserInfo);
+
+                    wx.hideLoading();
+                    resolve(defaultUserInfo);
+                }).catch(addErr => {
+                    console.error('创建用户失败:', addErr);
+
+                    // 如果是因为用户已存在，尝试再次获取用户信息
+                    if (addErr.errCode === -502001) {
+                        db.collection('users').doc(openid).get().then(res => {
+                            console.log('用户已存在，获取信息成功:', res.data);
+                            this.globalData.userInfo = res.data;
+                            this.globalData.isLogin = true;
+                            wx.setStorageSync('userInfo', res.data);
+
+                            wx.hideLoading();
+                            resolve(res.data);
+                        }).catch(getErr => {
+                            console.error('获取已存在用户信息失败:', getErr);
+                            this.globalData.userInfo = defaultUserInfo;
+                            this.globalData.isLogin = true;
+                            wx.setStorageSync('userInfo', defaultUserInfo);
+
+                            wx.hideLoading();
+                            resolve(defaultUserInfo);
+                        });
+                    } else {
+                        this.globalData.userInfo = defaultUserInfo;
+                        this.globalData.isLogin = true;
+                        wx.setStorageSync('userInfo', defaultUserInfo);
+
+                        wx.hideLoading();
+                        resolve(defaultUserInfo);
+                    }
+                });
+            }
         });
     },
 

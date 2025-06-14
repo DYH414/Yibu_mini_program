@@ -133,33 +133,94 @@ Page({
             .then(res => {
                 const comments = res.data
 
-                // 处理评论数据
-                const processedComments = comments.map(comment => {
-                    // 使用保存的用户信息，如果没有则使用默认值
-                    const user = {
-                        nickname: comment.userNickname || '用户',
-                        avatarUrl: comment.userAvatarUrl || '/images/default-avatar.png'
-                    };
+                if (comments.length === 0) {
+                    this.setData({
+                        comments: [],
+                        commentLoading: false
+                    });
+                    return;
+                }
 
-                    // 对于旧数据，可能没有保存用户信息，需要兼容处理
-                    if (!comment.userNickname && !comment.userAvatarUrl) {
-                        // 这里可以选择查询用户集合，但为了性能考虑，直接使用默认值
-                        // 后续新评论都会直接保存用户信息
-                    }
+                // 收集所有评论的用户openid
+                const userOpenIds = [...new Set(comments.map(comment => comment.userOpenId))];
 
-                    // 当前用户是否点赞过
-                    const isLiked = comment.likedBy && comment.likedBy.includes(this.data.userOpenid);
-
-                    return {
-                        ...comment,
-                        user: user,
-                        isLiked: isLiked
-                    };
+                // 批量获取用户信息
+                const userPromises = userOpenIds.map(openid => {
+                    return db.collection('users').doc(openid).get()
+                        .then(userRes => {
+                            return {
+                                openid: openid,
+                                userInfo: userRes.data
+                            };
+                        })
+                        .catch(err => {
+                            console.error(`获取用户 ${openid} 信息失败:`, err);
+                            return {
+                                openid: openid,
+                                userInfo: {
+                                    nickname: '用户',
+                                    avatarUrl: '/images/default-avatar.png'
+                                }
+                            };
+                        });
                 });
 
-                this.setData({
-                    comments: processedComments,
-                    commentLoading: false
+                // 等待所有用户信息获取完成
+                Promise.all(userPromises).then(usersData => {
+                    // 将用户信息转换为以openid为键的对象，方便查找
+                    const usersMap = {};
+                    usersData.forEach(userData => {
+                        usersMap[userData.openid] = userData.userInfo;
+                    });
+
+                    // 处理评论数据，关联最新的用户信息
+                    const processedComments = comments.map(comment => {
+                        // 获取该评论对应的最新用户信息
+                        const userInfo = usersMap[comment.userOpenId] || {
+                            nickname: comment.userNickname || '用户',
+                            avatarUrl: comment.userAvatarUrl || '/images/default-avatar.png'
+                        };
+
+                        // 当前用户是否点赞过
+                        const isLiked = comment.likedBy && comment.likedBy.includes(this.data.userOpenid);
+
+                        return {
+                            ...comment,
+                            user: {
+                                nickname: userInfo.nickname,
+                                avatarUrl: userInfo.avatarUrl
+                            },
+                            isLiked: isLiked
+                        };
+                    });
+
+                    this.setData({
+                        comments: processedComments,
+                        commentLoading: false
+                    });
+                }).catch(err => {
+                    console.error('处理用户信息失败:', err);
+
+                    // 如果获取用户信息失败，使用评论中保存的用户信息
+                    const fallbackComments = comments.map(comment => {
+                        const user = {
+                            nickname: comment.userNickname || '用户',
+                            avatarUrl: comment.userAvatarUrl || '/images/default-avatar.png'
+                        };
+
+                        const isLiked = comment.likedBy && comment.likedBy.includes(this.data.userOpenid);
+
+                        return {
+                            ...comment,
+                            user: user,
+                            isLiked: isLiked
+                        };
+                    });
+
+                    this.setData({
+                        comments: fallbackComments,
+                        commentLoading: false
+                    });
                 });
             })
             .catch(err => {
@@ -296,12 +357,13 @@ Page({
 
         // 获取用户信息
         const userInfo = app.globalData.userInfo || {}
+        const userOpenId = this.data.userOpenid
 
         db.collection('comments').add({
             data: {
                 merchantId: this.data.merchantId,
-                userOpenId: this.data.userOpenid,
-                // 直接保存用户昵称和头像，避免每次查询
+                userOpenId: userOpenId,
+                // 为了兼容性，仍然保存当前的用户昵称和头像
                 userNickname: userInfo.nickname || '微信用户',
                 userAvatarUrl: userInfo.avatarUrl || '/images/default-avatar.png',
                 content: content,

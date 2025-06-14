@@ -100,7 +100,6 @@ Page({
         this.setData({ isLoading: true })
         wx.showLoading({ title: '保存中...' })
 
-        const db = wx.cloud.database()
         const openid = app.globalData.openid
 
         console.log('准备保存用户信息:', {
@@ -109,7 +108,60 @@ Page({
             openid: openid
         })
 
-        // 使用update而不是set，并且不包含_id字段
+        // 使用云函数更新用户信息
+        wx.cloud.callFunction({
+            name: 'fixUserInfo',
+            data: {
+                userInfo: {
+                    nickname: this.data.nickname,
+                    avatarUrl: this.data.avatarUrl
+                }
+            },
+            success: res => {
+                console.log('云函数更新用户信息成功:', res.result)
+
+                if (res.result.success) {
+                    // 更新全局用户信息
+                    app.globalData.userInfo = res.result.userInfo
+                    app.globalData.isLogin = true
+
+                    // 更新本地存储
+                    wx.setStorageSync('userInfo', res.result.userInfo)
+
+                    wx.hideLoading()
+                    wx.showToast({
+                        title: '保存成功',
+                        success: () => {
+                            setTimeout(() => {
+                                wx.navigateBack()
+                            }, 1000)
+                        }
+                    })
+                } else {
+                    console.error('云函数更新用户信息失败:', res.result)
+                    wx.hideLoading()
+                    wx.showToast({
+                        title: '保存失败',
+                        icon: 'none'
+                    })
+                    this.setData({ isLoading: false })
+                }
+            },
+            fail: err => {
+                console.error('调用云函数失败:', err)
+
+                // 备用方案：使用数据库API更新
+                this.updateUserInfoWithDB()
+            }
+        })
+    },
+
+    // 备用方案：使用数据库API更新用户信息
+    updateUserInfoWithDB: function () {
+        const db = wx.cloud.database()
+        const openid = app.globalData.openid
+
+        // 使用update方法更新用户信息
         db.collection('users').doc(openid).update({
             data: {
                 nickname: this.data.nickname,
@@ -120,27 +172,34 @@ Page({
             console.log('保存用户信息成功')
 
             // 更新全局用户信息
-            app.globalData.userInfo = {
+            const updatedUserInfo = {
                 _id: openid,
                 nickname: this.data.nickname,
                 avatarUrl: this.data.avatarUrl,
                 updateTime: new Date()
+            };
+
+            // 保留原有的其他字段
+            if (app.globalData.userInfo) {
+                if (app.globalData.userInfo.createTime) {
+                    updatedUserInfo.createTime = app.globalData.userInfo.createTime;
+                }
             }
 
-            console.log('更新后的全局用户信息:', app.globalData.userInfo)
+            app.globalData.userInfo = updatedUserInfo;
 
-            // 等待一段时间确保数据库更新完成
-            setTimeout(() => {
-                wx.hideLoading()
-                wx.showToast({
-                    title: '保存成功',
-                    success: () => {
-                        setTimeout(() => {
-                            wx.navigateBack()
-                        }, 1000)
-                    }
-                })
-            }, 1000)
+            // 确保本地存储也更新
+            wx.setStorageSync('userInfo', app.globalData.userInfo)
+
+            wx.hideLoading()
+            wx.showToast({
+                title: '保存成功',
+                success: () => {
+                    setTimeout(() => {
+                        wx.navigateBack()
+                    }, 1000)
+                }
+            })
         }).catch(err => {
             console.error('保存用户信息失败', err)
             wx.hideLoading()

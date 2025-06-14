@@ -40,14 +40,24 @@ Page({
 
         wx.showLoading({ title: '加载中...' })
 
-        // 直接从数据库获取最新用户信息
+        // 直接从数据库获取最新用户信息，禁用缓存
         db.collection('users').doc(openid).get({
             success: res => {
                 console.log('获取最新用户信息成功:', res.data)
 
+                // 确保获取到的是最新数据
+                if (!res.data || !res.data.nickname) {
+                    console.error('获取到的用户信息不完整:', res.data)
+                    wx.hideLoading()
+                    return
+                }
+
                 // 更新全局用户信息
                 app.globalData.userInfo = res.data
                 app.globalData.isLogin = true
+
+                // 更新本地存储
+                wx.setStorageSync('userInfo', res.data)
 
                 // 更新页面数据
                 this.setData({
@@ -56,10 +66,22 @@ Page({
                 })
 
                 wx.hideLoading()
+
+                // 加载用户数据
+                this.loadUserData()
             },
             fail: err => {
                 console.error('获取最新用户信息失败:', err)
                 wx.hideLoading()
+
+                // 如果获取失败，尝试使用全局数据
+                if (app.globalData.userInfo) {
+                    this.setData({
+                        userInfo: app.globalData.userInfo,
+                        isLogin: true
+                    })
+                    this.loadUserData()
+                }
             }
         })
     },

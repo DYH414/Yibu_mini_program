@@ -32,18 +32,26 @@ exports.main = async (event, context) => {
         console.log('用户不存在，创建新用户:', err)
 
         try {
-            const result = await userCollection.add({
+            // 尝试创建新用户
+            const userData = {
+                nickname: '微信用户', // 默认昵称
+                avatarUrl: '/images/default-avatar.png', // 默认头像
+                createTime: db.serverDate()
+            };
+
+            // 使用add方法并指定_id
+            await userCollection.add({
                 data: {
                     _id: openid,
-                    nickname: '微信用户', // 默认昵称
-                    avatarUrl: '/images/default-avatar.png', // 默认头像
-                    createTime: db.serverDate()
+                    ...userData
                 }
-            })
-            console.log('创建新用户成功:', result)
+            });
+
+            console.log('创建新用户成功');
 
             // 创建成功后，再次查询用户信息并返回
-            const newUser = await userCollection.doc(openid).get()
+            const newUser = await userCollection.doc(openid).get();
+            console.log('新用户信息:', newUser.data);
 
             return {
                 openid,
@@ -51,7 +59,24 @@ exports.main = async (event, context) => {
                 isNew: true
             }
         } catch (createErr) {
-            console.error('创建新用户失败:', createErr)
+            console.error('创建新用户失败:', createErr);
+
+            // 如果是因为用户已存在导致的错误，尝试再次获取用户信息
+            if (createErr.errCode === -502001) {
+                try {
+                    const existingUser = await userCollection.doc(openid).get();
+                    console.log('用户已存在，重新获取信息:', existingUser.data);
+
+                    return {
+                        openid,
+                        user: existingUser.data,
+                        isNew: false
+                    };
+                } catch (getErr) {
+                    console.error('获取已存在用户信息失败:', getErr);
+                }
+            }
+
             return {
                 openid,
                 error: createErr,
