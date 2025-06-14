@@ -80,7 +80,7 @@
       <view wx:if="{{!loading && favorites.length === 0}}" class="empty-state card">
         <image class="empty-icon" src="/images/icons/empty-favorite.png"></image>
         <text>暂无收藏的商家</text>
-        <view class="empty-action">去浏览商家</view>
+        <view class="empty-action" bindtap="goToIndex" hover-class="button-hover">去浏览商家</view>
       </view>
       
       <!-- 加载状态 -->

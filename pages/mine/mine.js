@@ -185,6 +185,13 @@ Page({
         })
     },
 
+    // 跳转到首页
+    goToIndex: function () {
+        wx.switchTab({
+            url: '/pages/index/index'
+        })
+    },
+
     // 跳转到编辑个人信息页面
     goToEditProfile: function () {
         wx.navigateTo({

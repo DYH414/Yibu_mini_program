@@ -455,17 +455,41 @@
 /* 空状态操作按钮 */
 .empty-action {
   margin-top: 24rpx;
-  color: #FF6B6B;
+  color: #fff;
   font-size: 28rpx;
-  padding: 12rpx 32rpx;
-  border: 1px solid rgba(255, 107, 107, 0.3);
+  padding: 16rpx 40rpx;
+  background: linear-gradient(135deg, #FF6B6B 0%, #FF9E53 100%);
   border-radius: 30rpx;
   transition: all 0.3s ease;
+  box-shadow: 0 6rpx 12rpx rgba(255, 107, 107, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.empty-action::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(45deg);
+  animation: shine 2s infinite;
+}
+
+@keyframes shine {
+  0% {
+    transform: translateX(-100%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) rotate(45deg);
+  }
 }
 
 .empty-action:active {
-  background-color: rgba(255, 107, 107, 0.05);
   transform: scale(0.95);
+  box-shadow: 0 4rpx 8rpx rgba(255, 107, 107, 0.2);
 }
 
 /* 加载动画 */
