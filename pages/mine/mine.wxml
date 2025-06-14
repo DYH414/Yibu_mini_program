@@ -97,12 +97,47 @@
       <view class="action-icon about-icon"></view>
       <text>关于我们</text>
     </view>
-    <view class="action-item" hover-class="action-hover">
+    <view class="action-item" hover-class="action-hover" bindtap="contactService">
       <view class="action-icon service-icon"></view>
       <text>联系客服</text>
     </view>
     <view class="action-item logout" bindtap="logout" hover-class="logout-hover">
       <text>退出登录</text>
+    </view>
+  </view>
+
+  <!-- 联系客服弹窗 -->
+  <view class="contact-modal-mask" wx:if="{{showContactModal}}" bindtap="hideContactModal">
+    <view class="contact-modal" catchtap="stopPropagation">
+      <view class="contact-modal-header">
+        <view class="contact-avatar">
+          <image src="/images/default-avatar.png" mode="aspectFill"></image>
+        </view>
+        <view class="contact-title">客服小布</view>
+        <view class="contact-subtitle">为您提供贴心服务</view>
+      </view>
+      
+      <view class="contact-content">
+        <view class="contact-info">
+          <view class="contact-phone">{{phoneNumber}}</view>
+          <view class="contact-tip">微信同号，欢迎添加</view>
+        </view>
+        
+        <view class="contact-actions">
+          <view class="contact-action-btn copy-btn" bindtap="copyPhoneNumber" hover-class="btn-hover">
+            <view class="btn-icon copy-icon"></view>
+            <text>复制号码</text>
+          </view>
+          <view class="contact-action-btn call-btn" bindtap="callPhoneNumber" hover-class="btn-hover">
+            <view class="btn-icon call-icon"></view>
+            <text>拨打电话</text>
+          </view>
+        </view>
+      </view>
+      
+      <view class="contact-close" bindtap="hideContactModal">
+        <view class="close-icon"></view>
+      </view>
     </view>
   </view>
 </view> 

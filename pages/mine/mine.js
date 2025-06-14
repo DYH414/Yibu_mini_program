@@ -10,7 +10,9 @@ Page({
         commentCount: 0,
         ratingCount: 0,
         favorites: [],
-        loading: true
+        loading: true,
+        showContactModal: false,
+        phoneNumber: ''
     },
 
     onLoad: function (options) {
@@ -192,6 +194,61 @@ Page({
         })
     },
 
+    // 联系客服
+    contactService: function () {
+        // 设置要展示和复制的手机号
+        const phoneNumber = '17805978513';
+
+        // 显示联系客服弹窗
+        this.setData({
+            showContactModal: true,
+            phoneNumber: phoneNumber
+        });
+    },
+
+    // 复制手机号
+    copyPhoneNumber: function () {
+        const phoneNumber = this.data.phoneNumber;
+
+        wx.setClipboardData({
+            data: phoneNumber,
+            success: () => {
+                wx.showToast({
+                    title: '已复制到剪贴板',
+                    icon: 'success',
+                    duration: 1500
+                });
+
+                // 2秒后关闭弹窗
+                setTimeout(() => {
+                    this.hideContactModal();
+                }, 2000);
+            }
+        });
+    },
+
+    // 拨打电话
+    callPhoneNumber: function () {
+        const phoneNumber = this.data.phoneNumber;
+
+        wx.makePhoneCall({
+            phoneNumber: phoneNumber,
+            fail: () => {
+                wx.showToast({
+                    title: '拨号取消',
+                    icon: 'none'
+                });
+            }
+        });
+    },
+
+    // 隐藏联系客服弹窗
+    hideContactModal: function () {
+        this.setData({
+            showContactModal: false
+        });
+    },
+
     // 跳转到编辑个人信息页面
     goToEditProfile: function () {
         wx.navigateTo({
@@ -271,5 +328,11 @@ Page({
                 }
             }
         })
-    }
+    },
+
+    // 阻止事件冒泡
+    stopPropagation: function () {
+        // 阻止点击事件冒泡
+        return;
+    },
 }) 
