@@ -391,7 +391,7 @@ Page({
         })
     },
 
-    // 点赞评论
+    // 点赞/取消点赞评论
     likeComment: function (e) {
         if (!this.data.isLogin) {
             this.goToLogin()
@@ -404,50 +404,82 @@ Page({
         if (commentIndex === -1) return
 
         const comment = this.data.comments[commentIndex]
+        const isLiked = comment.isLiked
 
-        // 检查是否已点赞
-        if (comment.isLiked) {
-            wx.showToast({
-                title: '您已点赞过此评论',
-                icon: 'none'
+        if (isLiked) {
+            // 取消点赞
+            // 先获取当前评论数据
+            db.collection('comments').doc(commentId).get().then(res => {
+                const currentComment = res.data
+                const likedBy = currentComment.likedBy || []
+
+                // 移除当前用户的openid
+                const newLikedBy = likedBy.filter(id => id !== this.data.userOpenid)
+
+                // 更新点赞数据
+                return db.collection('comments').doc(commentId).update({
+                    data: {
+                        likes: newLikedBy.length, // 直接设置为新的点赞数量
+                        likedBy: newLikedBy
+                    }
+                })
+            }).then(() => {
+                // 更新本地数据
+                const comments = this.data.comments
+                comments[commentIndex].likes = Math.max(0, comments[commentIndex].likes - 1) // 确保点赞数不为负数
+                comments[commentIndex].isLiked = false
+
+                if (comments[commentIndex].likedBy) {
+                    comments[commentIndex].likedBy = comments[commentIndex].likedBy.filter(id => id !== this.data.userOpenid)
+                }
+
+                // 重新排序
+                comments.sort((a, b) => b.likes - a.likes)
+
+                this.setData({
+                    comments: comments
+                })
+            }).catch(err => {
+                console.error('取消点赞失败', err)
+                wx.showToast({
+                    title: '操作失败',
+                    icon: 'none'
+                })
             })
-            return
+        } else {
+            // 添加点赞
+            db.collection('comments').doc(commentId).update({
+                data: {
+                    likes: _.inc(1),
+                    likedBy: _.push(this.data.userOpenid)
+                }
+            }).then(() => {
+                // 更新本地数据
+                const comments = this.data.comments
+                comments[commentIndex].likes += 1
+                comments[commentIndex].isLiked = true
+
+                // 更新likedBy数组
+                if (!comments[commentIndex].likedBy) {
+                    comments[commentIndex].likedBy = [this.data.userOpenid]
+                } else {
+                    comments[commentIndex].likedBy.push(this.data.userOpenid)
+                }
+
+                // 重新排序
+                comments.sort((a, b) => b.likes - a.likes)
+
+                this.setData({
+                    comments: comments
+                })
+            }).catch(err => {
+                console.error('点赞失败', err)
+                wx.showToast({
+                    title: '操作失败',
+                    icon: 'none'
+                })
+            })
         }
-
-        wx.showLoading({ title: '处理中...' })
-
-        // 更新点赞数据
-        db.collection('comments').doc(commentId).update({
-            data: {
-                likes: _.inc(1),
-                likedBy: _.push(this.data.userOpenid)
-            }
-        }).then(() => {
-            // 更新本地数据
-            const comments = this.data.comments
-            comments[commentIndex].likes += 1
-            comments[commentIndex].isLiked = true
-
-            // 重新排序
-            comments.sort((a, b) => b.likes - a.likes)
-
-            this.setData({
-                comments: comments
-            })
-
-            wx.hideLoading()
-            wx.showToast({
-                title: '点赞成功',
-                icon: 'success'
-            })
-        }).catch(err => {
-            console.error('点赞失败', err)
-            wx.hideLoading()
-            wx.showToast({
-                title: '点赞失败',
-                icon: 'none'
-            })
-        })
     },
 
     // 收藏/取消收藏
