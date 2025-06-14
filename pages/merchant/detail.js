@@ -406,6 +406,25 @@ Page({
         const comment = this.data.comments[commentIndex]
         const isLiked = comment.isLiked
 
+        // 为当前评论添加动画标记
+        const comments = [...this.data.comments]
+        comments[commentIndex].animating = true
+
+        this.setData({
+            comments: comments
+        })
+
+        // 动画结束后移除动画标记
+        setTimeout(() => {
+            const updatedComments = [...this.data.comments]
+            if (updatedComments[commentIndex]) {
+                updatedComments[commentIndex].animating = false
+                this.setData({
+                    comments: updatedComments
+                })
+            }
+        }, 500)
+
         if (isLiked) {
             // 取消点赞
             // 先获取当前评论数据

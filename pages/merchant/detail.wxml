@@ -83,9 +83,10 @@
           <view class="comment-content">{{item.content}}</view>
           <view class="comment-footer">
             <text class="comment-time">{{item.timestamp ? item.timestamp.toLocaleDateString() : ''}}</text>
-            <view class="like-btn {{item.isLiked ? 'active' : ''}}" bindtap="likeComment" data-id="{{item._id}}">
+            <view class="like-btn {{item.isLiked ? 'active' : ''}} {{item.animating ? 'animate' : ''}}" bindtap="likeComment" data-id="{{item._id}}">
               <image src="/images/icons/{{item.isLiked ? 'like-filled.png' : 'like.png'}}"></image>
               <text>{{item.likes || 0}}</text>
+              <view class="like-ripple" wx:if="{{!item.isLiked && item.animating}}"></view>
             </view>
           </view>
         </view>
