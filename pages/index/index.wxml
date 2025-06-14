@@ -43,7 +43,9 @@
         bindtap="switchCategory"
         data-id="{{item.id}}"
         hover-class="category-item-hover">
-        <image class="category-icon" src="{{item.icon}}" mode="aspectFill"></image>
+        <view class="icon-container">
+          <image class="category-icon" src="{{item.icon}}" mode="aspectFit"></image>
+        </view>
         <text class="category-name">{{item.name}}</text>
       </view>
     </view>
