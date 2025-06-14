@@ -62,6 +62,38 @@ Page({
     },
 
     /**
+     * 生成评分星星数组
+     * @param {number} rating - 评分值(0-5)
+     * @return {Array} 包含5个元素的数组，每个元素为'full', 'half', 或 'empty'
+     */
+    generateStarArray: function (rating) {
+        const stars = [];
+        const intRating = Math.floor(rating);
+        const decimalPart = rating - intRating;
+
+        // 添加实心星星
+        for (let i = 0; i < intRating; i++) {
+            stars.push('full');
+        }
+
+        // 添加半星（如果小数部分 >= 0.3 且 < 0.8）
+        if (decimalPart >= 0.3 && decimalPart < 0.8 && stars.length < 5) {
+            stars.push('half');
+        }
+        // 添加实心星（如果小数部分 >= 0.8）
+        else if (decimalPart >= 0.8 && stars.length < 5) {
+            stars.push('full');
+        }
+
+        // 添加空心星星
+        while (stars.length < 5) {
+            stars.push('empty');
+        }
+
+        return stars;
+    },
+
+    /**
      * 加载商家数据
      * 从云数据库获取商家列表，并计算每个商家的平均评分
      * 支持按分类筛选和按评分/默认排序
@@ -129,6 +161,9 @@ Page({
 
                             merchant.ratingCount = ratingCount
                             merchant.avgRating = avgRating
+
+                            // 生成星星数组
+                            merchant.starArray = this.generateStarArray(avgRating)
 
                             return merchant
                         })

@@ -49,10 +49,10 @@
           <view class="merchant-name ellipsis">{{item.name}}</view>
           <view class="merchant-rating">
             <view class="rate">
-              <block wx:for="{{5}}" wx:key="*this" wx:for-item="starIndex">
+              <block wx:for="{{item.starArray}}" wx:key="index" wx:for-item="starType">
                 <image 
                   class="rate-star" 
-                  src="/images/stars/{{starIndex < Math.floor(item.avgRating) ? 'star-full.png' : (starIndex < Math.ceil(item.avgRating) ? 'star-half.png' : 'star-empty.png')}}">
+                  src="/images/stars/star-{{starType}}.png">
                 </image>
               </block>
               <text class="rating-text">{{item.avgRating}} ({{item.ratingCount}})</text>
