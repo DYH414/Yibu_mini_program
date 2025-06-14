@@ -272,4 +272,62 @@
   border-radius: 16rpx;
   margin-top: 24rpx;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* 添加搜索栏样式 */
+.search-container {
+  width: 100%;
+  padding: 10px 15px;
+  box-sizing: border-box;
+  background-color: #fff;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  background-color: #f5f5f5;
+  border-radius: 18px;
+  padding: 0 12px;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s;
+}
+
+.search-bar:active {
+  transform: scale(0.98);
+}
+
+.search-icon {
+  margin-right: 8px;
+  color: #999;
+}
+
+.search-input {
+  flex: 1;
+  height: 100%;
+  font-size: 14px;
+  color: #333;
+}
+
+.search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+/* 加载更多提示 */
+.load-more-tip {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 15px 0;
+}
+
+.load-more-tip text {
+  font-size: 12px;
+  color: #999;
 } 

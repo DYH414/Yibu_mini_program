@@ -1,0 +1,26 @@
+<!-- 搜索历史组件 -->
+<view class="search-history" wx:if="{{visible && historyItems.length > 0}}">
+  <view class="history-header">
+    <text class="history-title">搜索历史</text>
+    <view class="clear-all" bindtap="clearAllHistory">清空</view>
+  </view>
+  
+  <view class="history-list">
+    <view 
+      class="history-item" 
+      wx:for="{{historyItems}}" 
+      wx:key="_id"
+      bindtap="onHistoryItemTap"
+      data-keyword="{{item.keyword}}"
+      hover-class="history-item-hover">
+      <text class="history-keyword ellipsis">{{item.keyword}}</text>
+      <view 
+        class="clear-item" 
+        catchtap="onClearItem" 
+        data-id="{{item._id}}"
+        data-keyword="{{item.keyword}}">
+        <icon type="clear" size="12"></icon>
+      </view>
+    </view>
+  </view>
+</view> 

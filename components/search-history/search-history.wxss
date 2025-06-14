@@ -1,0 +1,67 @@
+/* 搜索历史组件样式 */
+.search-history {
+  width: 100%;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.history-title {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.clear-all {
+  font-size: 12px;
+  color: #999;
+  padding: 4px 8px;
+}
+
+.history-list {
+  padding: 5px 0;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  transition: background-color 0.3s;
+}
+
+.history-item-hover {
+  background-color: #f9f9f9;
+}
+
+.history-keyword {
+  flex: 1;
+  font-size: 14px;
+  color: #333;
+  margin-right: 10px;
+}
+
+.clear-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+} 

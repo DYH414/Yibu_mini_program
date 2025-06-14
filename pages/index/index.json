@@ -1,6 +1,9 @@
 {
+    "navigationBarTitleText": "一布校园外卖聚合",
     "enablePullDownRefresh": true,
     "backgroundColor": "#F8F8F8",
     "backgroundTextStyle": "dark",
-    "usingComponents": {}
+    "usingComponents": {
+        "search-history": "/components/search-history/search-history"
+    }
 }
