@@ -1,5 +1,11 @@
 <!-- index.wxml -->
 <view class="container">
+  <!-- 刷新状态指示器 -->
+  <view class="refresh-indicator" wx:if="{{isRefreshing}}">
+    <view class="refresh-loading"></view>
+    <text class="refresh-text">正在刷新...</text>
+  </view>
+
   <!-- 分类导航 -->
   <scroll-view class="category-scroll" scroll-x enable-flex scroll-with-animation>
     <view class="category-list">
@@ -61,7 +67,7 @@
     </view>
 
     <!-- 加载状态 -->
-    <view wx:if="{{loading}}" class="loading-state">
+    <view wx:if="{{loading && !isRefreshing}}" class="loading-state">
       <text>加载中...</text>
     </view>
   </view>

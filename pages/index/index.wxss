@@ -3,6 +3,42 @@
   padding: 0;
 }
 
+/* 刷新状态指示器 */
+.refresh-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80rpx;
+  background-color: #f8f8f8;
+  width: 100%;
+  position: relative;
+  z-index: 20;
+}
+
+.refresh-loading {
+  width: 36rpx;
+  height: 36rpx;
+  border: 3rpx solid #FF6B6B;
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: refresh-rotate 0.8s linear infinite;
+  margin-right: 10rpx;
+}
+
+.refresh-text {
+  font-size: 24rpx;
+  color: #666;
+}
+
+@keyframes refresh-rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 /* 分类导航 */
 .category-scroll {
   width: 100%;

@@ -18,13 +18,26 @@ Page({
         merchants: [],
         loading: true,
         sortBy: 'default', // default 或 rating
+        isRefreshing: false // 标记是否正在下拉刷新
     },
 
     onLoad: function (options) {
         this.loadMerchants()
     },
 
+    /**
+     * 下拉刷新处理函数
+     * 当用户下拉页面时触发，重新加载商家数据
+     */
     onPullDownRefresh: function () {
+        console.log('触发下拉刷新')
+        // 设置刷新状态
+        this.setData({
+            isRefreshing: true,
+            loading: true
+        })
+
+        // 重新加载商家数据
         this.loadMerchants()
     },
 
@@ -48,8 +61,21 @@ Page({
         this.loadMerchants()
     },
 
-    // 加载商家数据
+    /**
+     * 加载商家数据
+     * 从云数据库获取商家列表，并计算每个商家的平均评分
+     * 支持按分类筛选和按评分/默认排序
+     */
     loadMerchants: function () {
+        console.log('加载商家数据，分类:', this.data.currentCategory, '排序:', this.data.sortBy)
+
+        // 清空现有数据，避免下拉刷新时显示旧数据
+        if (this.data.isRefreshing) {
+            this.setData({
+                merchants: []
+            })
+        }
+
         let query = db.collection('merchants')
 
         // 根据分类筛选
@@ -69,6 +95,20 @@ Page({
             .get()
             .then(res => {
                 let merchants = res.data
+                console.log('获取到商家数据:', merchants.length, '条')
+
+                // 如果没有数据，直接更新状态并结束刷新
+                if (merchants.length === 0) {
+                    this.setData({
+                        merchants: [],
+                        loading: false,
+                        isRefreshing: false
+                    })
+
+                    // 停止下拉刷新动画
+                    wx.stopPullDownRefresh()
+                    return
+                }
 
                 // 加载每个商家的评分信息
                 const tasks = merchants.map(merchant => {
@@ -102,17 +142,29 @@ Page({
 
                     this.setData({
                         merchants: updatedMerchants,
-                        loading: false
+                        loading: false,
+                        isRefreshing: false
                     })
 
+                    console.log('数据加载完成，停止下拉刷新')
+                    // 停止下拉刷新动画
                     wx.stopPullDownRefresh()
                 })
             })
             .catch(err => {
                 console.error('加载商家数据失败', err)
                 this.setData({
-                    loading: false
+                    loading: false,
+                    isRefreshing: false
                 })
+
+                // 显示错误提示
+                wx.showToast({
+                    title: '刷新失败',
+                    icon: 'none'
+                })
+
+                // 停止下拉刷新动画
                 wx.stopPullDownRefresh()
             })
     },
