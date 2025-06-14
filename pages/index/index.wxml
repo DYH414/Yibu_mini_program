@@ -14,7 +14,8 @@
         wx:for="{{categories}}" 
         wx:key="id"
         bindtap="switchCategory"
-        data-id="{{item.id}}">
+        data-id="{{item.id}}"
+        hover-class="category-item-hover">
         <image class="category-icon" src="{{item.icon}}" mode="aspectFill"></image>
         <text class="category-name">{{item.name}}</text>
       </view>
@@ -23,10 +24,10 @@
 
   <!-- 排序选项 -->
   <view class="sort-bar">
-    <view class="sort-item {{sortBy === 'default' ? 'active' : ''}}" bindtap="switchSort" data-sort="default">
+    <view class="sort-item {{sortBy === 'default' ? 'active' : ''}}" bindtap="switchSort" data-sort="default" hover-class="sort-item-hover">
       <text>默认排序</text>
     </view>
-    <view class="sort-item {{sortBy === 'rating' ? 'active' : ''}}" bindtap="switchSort" data-sort="rating">
+    <view class="sort-item {{sortBy === 'rating' ? 'active' : ''}}" bindtap="switchSort" data-sort="rating" hover-class="sort-item-hover">
       <text>按评分</text>
     </view>
   </view>
@@ -39,7 +40,8 @@
         wx:for="{{merchants}}" 
         wx:key="_id"
         bindtap="goToMerchantDetail"
-        data-id="{{item._id}}">
+        data-id="{{item._id}}"
+        hover-class="merchant-card-hover">
         <view class="merchant-logo">
           <image src="{{item.logoUrl}}" mode="aspectFill"></image>
         </view>
