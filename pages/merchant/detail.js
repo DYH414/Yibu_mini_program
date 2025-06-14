@@ -16,7 +16,10 @@ Page({
         isFavorite: false,
         loading: true,
         commentLoading: false,
-        ratingSubmitting: false
+        ratingSubmitting: false,
+        favoriteAnimating: false, // 收藏按钮动画状态
+        ratingStars: [], // 评分星星数组
+        emptyCommentImage: '/images/icons/empty-comment.png', // 空评论状态图片
     },
 
     onLoad: function (options) {
@@ -105,9 +108,13 @@ Page({
                     avgRating = (totalScore / ratingCount).toFixed(1)
                 }
 
+                // 生成评分星星数组
+                const ratingStars = this.generateRatingStars(avgRating)
+
                 this.setData({
                     'merchant.ratingCount': ratingCount,
                     'merchant.avgRating': avgRating,
+                    ratingStars: ratingStars,
                     loading: false
                 })
 
@@ -118,6 +125,34 @@ Page({
                 this.setData({ loading: false })
                 wx.stopPullDownRefresh()
             })
+    },
+
+    // 生成评分星星数组
+    generateRatingStars: function (rating) {
+        const stars = [];
+        const intRating = Math.floor(rating);
+        const decimalPart = rating - intRating;
+
+        // 添加实心星星
+        for (let i = 0; i < intRating; i++) {
+            stars.push('full');
+        }
+
+        // 添加半星（如果小数部分 >= 0.3 且 < 0.8）
+        if (decimalPart >= 0.3 && decimalPart < 0.8 && stars.length < 5) {
+            stars.push('half');
+        }
+        // 添加实心星（如果小数部分 >= 0.8）
+        else if (decimalPart >= 0.8 && stars.length < 5) {
+            stars.push('full');
+        }
+
+        // 添加空心星星
+        while (stars.length < 5) {
+            stars.push('empty');
+        }
+
+        return stars;
     },
 
     // 加载评论数据
@@ -190,7 +225,8 @@ Page({
                                 nickname: userInfo.nickname,
                                 avatarUrl: userInfo.avatarUrl
                             },
-                            isLiked: isLiked
+                            isLiked: isLiked,
+                            animating: false // 初始化动画状态
                         };
                     });
 
@@ -213,7 +249,8 @@ Page({
                         return {
                             ...comment,
                             user: user,
-                            isLiked: isLiked
+                            isLiked: isLiked,
+                            animating: false // 初始化动画状态
                         };
                     });
 
@@ -406,6 +443,9 @@ Page({
         const comment = this.data.comments[commentIndex]
         const isLiked = comment.isLiked
 
+        // 防止重复点击
+        if (comment.animating) return
+
         // 为当前评论添加动画标记
         const comments = [...this.data.comments]
         comments[commentIndex].animating = true
@@ -508,9 +548,18 @@ Page({
             return
         }
 
-        const isFavorite = this.data.isFavorite
+        // 防止重复点击
+        if (this.data.favoriteAnimating) return
 
-        wx.showLoading({ title: '处理中...' })
+        // 设置动画状态
+        this.setData({ favoriteAnimating: true })
+
+        // 动画结束后移除动画状态
+        setTimeout(() => {
+            this.setData({ favoriteAnimating: false })
+        }, 500)
+
+        const isFavorite = this.data.isFavorite
 
         if (isFavorite) {
             // 取消收藏
@@ -528,7 +577,6 @@ Page({
                 })
                 .then(() => {
                     this.setData({ isFavorite: false })
-                    wx.hideLoading()
                     wx.showToast({
                         title: '已取消收藏',
                         icon: 'success'
@@ -536,7 +584,6 @@ Page({
                 })
                 .catch(err => {
                     console.error('取消收藏失败', err)
-                    wx.hideLoading()
                     wx.showToast({
                         title: '操作失败',
                         icon: 'none'
@@ -552,14 +599,12 @@ Page({
                 }
             }).then(() => {
                 this.setData({ isFavorite: true })
-                wx.hideLoading()
                 wx.showToast({
                     title: '收藏成功',
                     icon: 'success'
                 })
             }).catch(err => {
                 console.error('收藏失败', err)
-                wx.hideLoading()
                 wx.showToast({
                     title: '操作失败',
                     icon: 'none'

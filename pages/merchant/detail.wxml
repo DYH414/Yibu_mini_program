@@ -10,10 +10,10 @@
         <view class="merchant-name">{{merchant.name}}</view>
         <view class="merchant-rating">
           <view class="rate">
-            <block wx:for="{{5}}" wx:key="*this" wx:for-item="starIndex">
+            <block wx:for="{{ratingStars}}" wx:key="index">
               <image 
                 class="rate-star" 
-                src="/images/stars/{{starIndex < Math.floor(merchant.avgRating) ? 'star-full.png' : (starIndex < Math.ceil(merchant.avgRating) ? 'star-half.png' : 'star-empty.png')}}">
+                src="/images/stars/star-{{item}}.png">
               </image>
             </block>
             <text class="rating-text">{{merchant.avgRating}} ({{merchant.ratingCount}})</text>
@@ -21,7 +21,7 @@
         </view>
         <view class="merchant-desc">{{merchant.description}}</view>
       </view>
-      <view class="favorite-btn" bindtap="toggleFavorite">
+      <view class="favorite-btn {{favoriteAnimating ? 'animate' : ''}}" bindtap="toggleFavorite">
         <image src="/images/icons/{{isFavorite ? 'favorite-filled.png' : 'favorite.png'}}"></image>
       </view>
     </view>
@@ -38,7 +38,8 @@
         wx:key="name"
         bindtap="navigateToPlatform"
         data-appid="{{item.appId}}"
-        data-name="{{item.name}}">
+        data-name="{{item.name}}"
+        hover-class="platform-item-hover">
         <image class="platform-icon" src="{{item.iconUrl}}" mode="aspectFill"></image>
         <text class="platform-name">{{item.name}}</text>
       </view>
@@ -46,7 +47,7 @@
     
     <!-- 复制商家名称 -->
     <view class="copy-name">
-      <button class="btn btn-small" bindtap="copyMerchantName">复制商家名称</button>
+      <button class="btn btn-small" bindtap="copyMerchantName" hover-class="btn-hover">复制商家名称</button>
     </view>
   </view>
 
@@ -60,7 +61,8 @@
             class="rate-star-big {{item < userRating ? 'active' : ''}}" 
             src="/images/stars/{{item < userRating ? 'star-full.png' : 'star-empty.png'}}"
             bindtap="submitRating"
-            data-rating="{{item + 1}}">
+            data-rating="{{item + 1}}"
+            hover-class="rate-star-hover">
           </image>
         </block>
       </view>
@@ -94,6 +96,7 @@
       
       <!-- 空状态 -->
       <view wx:if="{{!commentLoading && comments.length === 0}}" class="empty-state">
+        <image class="empty-image" src="{{emptyCommentImage}}" mode="aspectFit"></image>
         <text>暂无评论，快来发表第一条评论吧</text>
       </view>
       
@@ -114,6 +117,7 @@
       <button 
         class="btn btn-primary comment-submit-btn" 
         bindtap="submitComment"
+        hover-class="btn-hover"
         disabled="{{!isLogin || !commentContent}}">发表</button>
     </view>
   </view>
