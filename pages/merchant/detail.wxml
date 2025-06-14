@@ -30,16 +30,23 @@
   <!-- 平台跳转按钮 -->
   <view class="platform-section card">
     <view class="section-title">外卖平台</view>
+    <view class="platform-tip">点击图标跳转到对应平台</view>
     <view class="platform-list">
       <view 
         class="platform-item" 
         wx:for="{{platforms}}" 
         wx:key="name"
         bindtap="navigateToPlatform"
-        data-appid="{{item.appId}}">
+        data-appid="{{item.appId}}"
+        data-name="{{item.name}}">
         <image class="platform-icon" src="{{item.iconUrl}}" mode="aspectFill"></image>
         <text class="platform-name">{{item.name}}</text>
       </view>
+    </view>
+    
+    <!-- 复制商家名称 -->
+    <view class="copy-name">
+      <button class="btn btn-small" bindtap="copyMerchantName">复制商家名称</button>
     </view>
   </view>
 

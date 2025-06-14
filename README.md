@@ -142,6 +142,10 @@
 - 收藏：用户可收藏/取消收藏商家
 - 平台跳转：点击平台按钮，跳转至对应外卖平台小程序
 
+## 商家json编写格式
+{"_id":"c611b946684c375202b845c7615c0802","category":"fast-food","description":"文苑三楼","logoUrl":"cloud://cloudbase-0gdnnqax782f54fa.636c-cloudbase-0gdnnqax782f54fa-1363163853/images/shop_logo/xiaoage.jpg","name":"小阿哥煲仔饭","platforms":[{"appId":"wxdd01bfc7fb8cb134","iconUrl":"cloud://cloudbase-0gdnnqax782f54fa.636c-cloudbase-0gdnnqax782f54fa-1363163853/images/shop_logo/xiaoage.jpg","name":"自营"}]}
+
+
 ## 开发人员
 
 - 开发者：[您的名字]

@@ -520,6 +520,8 @@ Page({
     // 跳转到平台小程序
     navigateToPlatform: function (e) {
         const appId = e.currentTarget.dataset.appid
+        const platformName = e.currentTarget.dataset.name || '' // 获取平台名称
+
         if (!appId) {
             wx.showToast({
                 title: '无法跳转到该平台',
@@ -528,8 +530,13 @@ Page({
             return
         }
 
+        console.log('跳转到平台:', platformName, appId)
+
         wx.navigateToMiniProgram({
             appId: appId,
+            success: function () {
+                console.log('跳转成功')
+            },
             fail: err => {
                 console.error('跳转失败', err)
                 wx.showToast({
@@ -552,5 +559,27 @@ Page({
         wx.navigateTo({
             url: '/pages/login/login'
         })
+    },
+
+    // 复制商家名称
+    copyMerchantName: function () {
+        const merchantName = this.data.merchant.name || '';
+        if (!merchantName) {
+            wx.showToast({
+                title: '商家名称为空',
+                icon: 'none'
+            });
+            return;
+        }
+
+        wx.setClipboardData({
+            data: merchantName,
+            success: function () {
+                wx.showToast({
+                    title: '已复制商家名称',
+                    icon: 'success'
+                });
+            }
+        });
     }
 }) 
