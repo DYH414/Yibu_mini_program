@@ -4,48 +4,61 @@
   <view class="user-header card">
     <block wx:if="{{isLogin}}">
       <view class="user-info">
-        <image class="user-avatar" src="{{userInfo.avatarUrl}}"></image>
+        <view class="avatar-container">
+          <image class="user-avatar" src="{{userInfo.avatarUrl}}"></image>
+          <view class="avatar-border"></view>
+        </view>
         <text class="user-name">{{userInfo.nickname || '微信用户'}}</text>
-        <view class="edit-profile" bindtap="goToEditProfile">
+        <view class="edit-profile" bindtap="goToEditProfile" hover-class="button-hover">
           <text class="edit-text">编辑资料</text>
         </view>
       </view>
       <view class="user-stats">
-        <view class="stat-item">
+        <view class="stat-item" hover-class="stat-hover">
           <text class="stat-count">{{favoriteCount}}</text>
           <text class="stat-label">收藏</text>
+          <view class="stat-line"></view>
         </view>
-        <view class="stat-item">
+        <view class="stat-item" hover-class="stat-hover">
           <text class="stat-count">{{commentCount}}</text>
           <text class="stat-label">评论</text>
+          <view class="stat-line"></view>
         </view>
-        <view class="stat-item">
+        <view class="stat-item" hover-class="stat-hover">
           <text class="stat-count">{{ratingCount}}</text>
           <text class="stat-label">评分</text>
+          <view class="stat-line"></view>
         </view>
       </view>
     </block>
     <view wx:else class="not-login">
-      <image class="default-avatar" src="/images/default-avatar.png"></image>
+      <view class="avatar-container">
+        <image class="default-avatar" src="/images/default-avatar.png"></image>
+        <view class="avatar-border"></view>
+      </view>
       <text class="login-tip">登录后可评论、收藏与评分</text>
-      <button class="login-btn" bindtap="goToLogin">立即登录</button>
+      <button class="login-btn" bindtap="goToLogin" hover-class="button-hover">立即登录</button>
     </view>
   </view>
 
   <!-- 收藏列表 -->
   <block wx:if="{{isLogin}}">
-    <view class="section-title">我的收藏</view>
+    <view class="section-header">
+      <view class="section-title">我的收藏</view>
+      <view class="section-more" wx:if="{{favorites.length > 0}}">查看更多</view>
+    </view>
     <view class="favorite-list">
       <block wx:if="{{!loading && favorites.length > 0}}">
         <view 
           class="favorite-item card" 
           wx:for="{{favorites}}" 
-          wx:key="_id">
+          wx:key="_id"
+          hover-class="card-hover">
           <view 
             class="favorite-content" 
             bindtap="goToMerchantDetail" 
             data-id="{{item.merchantId}}">
-            <image class="merchant-logo" src="{{item.merchant.logoUrl}}"></image>
+            <image class="merchant-logo" src="{{item.merchant.logoUrl}}" mode="aspectFill"></image>
             <view class="merchant-info">
               <text class="merchant-name ellipsis">{{item.merchant.name}}</text>
               <text class="merchant-desc ellipsis-2">{{item.merchant.description}}</text>
@@ -55,7 +68,8 @@
             <view 
               class="cancel-btn" 
               bindtap="cancelFavorite" 
-              data-id="{{item._id}}">
+              data-id="{{item._id}}"
+              hover-class="button-hover">
               <text>取消收藏</text>
             </view>
           </view>
@@ -63,13 +77,15 @@
       </block>
       
       <!-- 空状态 -->
-      <view wx:if="{{!loading && favorites.length === 0}}" class="empty-state">
+      <view wx:if="{{!loading && favorites.length === 0}}" class="empty-state card">
         <image class="empty-icon" src="/images/icons/empty-favorite.png"></image>
         <text>暂无收藏的商家</text>
+        <view class="empty-action">去浏览商家</view>
       </view>
       
       <!-- 加载状态 -->
       <view wx:if="{{loading}}" class="loading-state">
+        <view class="loading-spinner"></view>
         <text>加载中...</text>
       </view>
     </view>
@@ -77,13 +93,15 @@
 
   <!-- 其他操作 -->
   <view class="action-list card" wx:if="{{isLogin}}">
-    <view class="action-item">
+    <view class="action-item" hover-class="action-hover">
+      <view class="action-icon about-icon"></view>
       <text>关于我们</text>
     </view>
-    <view class="action-item">
+    <view class="action-item" hover-class="action-hover">
+      <view class="action-icon service-icon"></view>
       <text>联系客服</text>
     </view>
-    <view class="action-item logout" bindtap="logout">
+    <view class="action-item logout" bindtap="logout" hover-class="logout-hover">
       <text>退出登录</text>
     </view>
   </view>
