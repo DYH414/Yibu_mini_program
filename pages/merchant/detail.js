@@ -23,21 +23,45 @@ Page({
     },
 
     onLoad: function (options) {
-        if (options.id) {
-            this.setData({
-                merchantId: options.id
-            })
-            this.loadMerchantData()
-            this.checkLoginStatus()
-        } else {
+        // 获取商家ID
+        const merchantId = options.id;
+
+        if (!merchantId) {
             wx.showToast({
-                title: '商家信息错误',
-                icon: 'error'
-            })
-            setTimeout(() => {
-                wx.navigateBack()
-            }, 1500)
+                title: '商家ID不能为空',
+                icon: 'none',
+                success: () => {
+                    setTimeout(() => {
+                        wx.navigateBack();
+                    }, 1500);
+                }
+            });
+            return;
         }
+
+        this.setData({
+            merchantId: merchantId,
+            loading: true
+        });
+
+        // 检查是否是首次使用，如果是则显示收藏按钮提示
+        const hasShownFavoriteTip = wx.getStorageSync('hasShownFavoriteTip');
+        if (!hasShownFavoriteTip) {
+            setTimeout(() => {
+                wx.showToast({
+                    title: '点击右上角可收藏商家',
+                    icon: 'none',
+                    duration: 3000
+                });
+                wx.setStorageSync('hasShownFavoriteTip', true);
+            }, 1500);
+        }
+
+        // 获取用户登录状态
+        this.checkLoginStatus();
+
+        // 加载商家信息
+        this.loadMerchantData();
     },
 
     onShow: function () {

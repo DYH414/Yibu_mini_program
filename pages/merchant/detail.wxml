@@ -21,8 +21,11 @@
         </view>
         <view class="merchant-desc">{{merchant.description}}</view>
       </view>
-      <view class="favorite-btn {{favoriteAnimating ? 'animate' : ''}}" bindtap="toggleFavorite">
-        <image src="/images/icons/{{isFavorite ? 'favorite-filled.png' : 'favorite.png'}}"></image>
+      <view class="favorite-btn-container {{favoriteAnimating ? 'animate' : ''}}" bindtap="toggleFavorite">
+        <view class="favorite-btn">
+          <image src="/images/icons/{{isFavorite ? 'favorite-filled.png' : 'favorite.png'}}"></image>
+          <text class="favorite-text">{{isFavorite ? '已收藏' : '收藏'}}</text>
+        </view>
       </view>
     </view>
   </view>
