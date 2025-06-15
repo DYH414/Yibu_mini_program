@@ -14,20 +14,20 @@
         </view>
       </view>
       <view class="user-stats">
-        <view class="stat-item" hover-class="stat-hover">
+        <view class="stat-item {{activeTab === 'favorite' ? 'active-stat' : ''}}" hover-class="stat-hover" bindtap="switchTab" data-tab="favorite">
           <text class="stat-count">{{favoriteCount}}</text>
           <text class="stat-label">收藏</text>
-          <view class="stat-line"></view>
+          <view class="stat-line {{activeTab === 'favorite' ? 'active-line' : ''}}"></view>
         </view>
-        <view class="stat-item" hover-class="stat-hover">
+        <view class="stat-item {{activeTab === 'comment' ? 'active-stat' : ''}}" hover-class="stat-hover" bindtap="switchTab" data-tab="comment">
           <text class="stat-count">{{commentCount}}</text>
           <text class="stat-label">评论</text>
-          <view class="stat-line"></view>
+          <view class="stat-line {{activeTab === 'comment' ? 'active-line' : ''}}"></view>
         </view>
-        <view class="stat-item" hover-class="stat-hover">
+        <view class="stat-item {{activeTab === 'rating' ? 'active-stat' : ''}}" hover-class="stat-hover" bindtap="switchTab" data-tab="rating">
           <text class="stat-count">{{ratingCount}}</text>
           <text class="stat-label">评分</text>
-          <view class="stat-line"></view>
+          <view class="stat-line {{activeTab === 'rating' ? 'active-line' : ''}}"></view>
         </view>
       </view>
     </block>
@@ -41,52 +41,138 @@
     </view>
   </view>
 
-  <!-- 收藏列表 -->
+  <!-- 内容区域 -->
   <block wx:if="{{isLogin}}">
-    <view class="section-header">
-      <view class="section-title">我的收藏</view>
-      <view class="section-more" wx:if="{{favorites.length > 0}}">查看更多</view>
-    </view>
-    <view class="favorite-list">
-      <block wx:if="{{!loading && favorites.length > 0}}">
-        <view 
-          class="favorite-item card" 
-          wx:for="{{favorites}}" 
-          wx:key="_id"
-          hover-class="card-hover">
-          <view 
-            class="favorite-content" 
-            bindtap="goToMerchantDetail" 
-            data-id="{{item.merchantId}}">
-            <image class="merchant-logo" src="{{item.merchant.logoUrl}}" mode="aspectFill"></image>
-            <view class="merchant-info">
-              <text class="merchant-name ellipsis">{{item.merchant.name}}</text>
-              <text class="merchant-desc ellipsis-2">{{item.merchant.description}}</text>
-            </view>
-          </view>
-          <view class="favorite-actions">
-            <view 
-              class="cancel-btn" 
-              bindtap="cancelFavorite" 
-              data-id="{{item._id}}"
-              hover-class="button-hover">
-              <text>取消收藏</text>
-            </view>
-          </view>
-        </view>
-      </block>
-      
-      <!-- 空状态 -->
-      <view wx:if="{{!loading && favorites.length === 0}}" class="empty-state card">
-        <image class="empty-icon" src="/images/icons/empty-favorite.png"></image>
-        <text>暂无收藏的商家</text>
-        <view class="empty-action" bindtap="goToIndex" hover-class="button-hover">去浏览商家</view>
+    <!-- 收藏标签页 -->
+    <view class="tab-content" wx:if="{{activeTab === 'favorite'}}">
+      <view class="section-header">
+        <view class="section-title">我的收藏</view>
       </view>
-      
-      <!-- 加载状态 -->
-      <view wx:if="{{loading}}" class="loading-state">
-        <view class="loading-spinner"></view>
-        <text>加载中...</text>
+      <view class="content-list">
+        <block wx:if="{{!loading && favorites.length > 0}}">
+          <view 
+            class="content-item card" 
+            wx:for="{{favorites}}" 
+            wx:key="_id"
+            hover-class="card-hover">
+            <view 
+              class="content-body" 
+              bindtap="goToMerchantDetail" 
+              data-id="{{item.merchantId}}">
+              <image class="merchant-logo" src="{{item.merchant.logoUrl}}" mode="aspectFill"></image>
+              <view class="merchant-info">
+                <text class="merchant-name ellipsis">{{item.merchant.name}}</text>
+                <text class="merchant-desc ellipsis-2">{{item.merchant.description}}</text>
+              </view>
+            </view>
+            <view class="content-actions">
+              <view 
+                class="action-btn cancel-btn" 
+                bindtap="cancelFavorite" 
+                data-id="{{item._id}}"
+                hover-class="button-hover">
+                <text>取消收藏</text>
+              </view>
+            </view>
+          </view>
+        </block>
+        
+        <!-- 空状态 -->
+        <view wx:if="{{!loading && favorites.length === 0}}" class="empty-state card">
+          <image class="empty-icon" src="/images/icons/empty-favorite.png"></image>
+          <text>暂无收藏的商家</text>
+          <view class="empty-action" bindtap="goToIndex" hover-class="button-hover">去浏览商家</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 评论标签页 -->
+    <view class="tab-content" wx:if="{{activeTab === 'comment'}}">
+      <view class="section-header">
+        <view class="section-title">我的评论</view>
+      </view>
+      <view class="content-list">
+        <block wx:if="{{!loading && comments.length > 0}}">
+          <view 
+            class="content-item card" 
+            wx:for="{{comments}}" 
+            wx:key="_id"
+            hover-class="card-hover">
+            <view 
+              class="content-body" 
+              bindtap="goToMerchantDetail" 
+              data-id="{{item.merchantId}}">
+              <image class="merchant-logo" src="{{item.merchant.logoUrl}}" mode="aspectFill"></image>
+              <view class="merchant-info">
+                <text class="merchant-name ellipsis">{{item.merchant.name}}</text>
+                <view class="comment-content">
+                  <text class="comment-text">{{item.content}}</text>
+                  <text class="comment-time">{{item.formattedTime}}</text>
+                </view>
+              </view>
+            </view>
+            <view class="content-actions">
+              <view class="like-info">
+                <view class="like-icon"></view>
+                <text class="like-count">{{item.likes || 0}}</text>
+              </view>
+              <view 
+                class="action-btn delete-btn" 
+                bindtap="deleteComment" 
+                data-id="{{item._id}}"
+                hover-class="button-hover">
+                <text>删除</text>
+              </view>
+            </view>
+          </view>
+        </block>
+        
+        <!-- 空状态 -->
+        <view wx:if="{{!loading && comments.length === 0}}" class="empty-state card">
+          <image class="empty-icon" src="/images/icons/empty-comment.png"></image>
+          <text>暂无评论记录</text>
+          <view class="empty-action" bindtap="goToIndex" hover-class="button-hover">去浏览商家</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 评分标签页 -->
+    <view class="tab-content" wx:if="{{activeTab === 'rating'}}">
+      <view class="section-header">
+        <view class="section-title">我的评分</view>
+      </view>
+      <view class="content-list">
+        <block wx:if="{{!loading && ratings.length > 0}}">
+          <view 
+            class="content-item card" 
+            wx:for="{{ratings}}" 
+            wx:key="_id"
+            hover-class="card-hover">
+            <view 
+              class="content-body" 
+              bindtap="goToMerchantDetail" 
+              data-id="{{item.merchantId}}">
+              <image class="merchant-logo" src="{{item.merchant.logoUrl}}" mode="aspectFill"></image>
+              <view class="merchant-info">
+                <text class="merchant-name ellipsis">{{item.merchant.name}}</text>
+                <view class="rating-stars">
+                  <block wx:for="{{item.starArray}}" wx:key="index" wx:for-item="starType">
+                    <image class="rate-star" src="/images/stars/star-{{starType}}.png"></image>
+                  </block>
+                  <text class="rating-score">{{item.score}}.0分</text>
+                  <text class="rating-time">{{item.formattedTime}}</text>
+                </view>
+              </view>
+            </view>
+          </view>
+        </block>
+        
+        <!-- 空状态 -->
+        <view wx:if="{{!loading && ratings.length === 0}}" class="empty-state card">
+          <image class="empty-icon" src="/images/icons/empty-rating.png"></image>
+          <text>暂无评分记录</text>
+          <view class="empty-action" bindtap="goToIndex" hover-class="button-hover">去浏览商家</view>
+        </view>
       </view>
     </view>
   </block>

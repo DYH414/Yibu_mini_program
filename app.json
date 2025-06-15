@@ -1,23 +1,23 @@
 {
     "pages": [
         "pages/index/index",
-        "pages/merchant/detail",
         "pages/mine/mine",
+        "pages/merchant/detail",
         "pages/login/login",
-        "pages/userEdit/userEdit",
-        "pages/admin/admin",
-        "pages/admin/fix-category"
+        "pages/profile/edit",
+        "pages/search/search"
     ],
     "window": {
         "backgroundTextStyle": "light",
-        "navigationBarBackgroundColor": "#FF6B6B",
+        "navigationBarBackgroundColor": "#ff9a9e",
         "navigationBarTitleText": "一布校园外卖聚合",
         "navigationBarTextStyle": "white"
     },
     "tabBar": {
-        "color": "#999999",
-        "selectedColor": "#FF6B6B",
-        "backgroundColor": "#ffffff",
+        "color": "#999",
+        "selectedColor": "#ff9a9e",
+        "backgroundColor": "#fff",
+        "borderStyle": "black",
         "list": [
             {
                 "pagePath": "pages/index/index",
