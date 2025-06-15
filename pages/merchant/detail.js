@@ -697,6 +697,14 @@ Page({
             },
             fail: err => {
                 console.error('跳转失败', err)
+
+                // 判断是否为用户主动取消
+                if (err.errMsg && err.errMsg.indexOf('cancel') !== -1) {
+                    console.log('用户取消跳转')
+                    return // 用户主动取消，不显示错误提示
+                }
+
+                // 其他失败情况才显示提示
                 wx.showToast({
                     title: '跳转失败',
                     icon: 'none'
