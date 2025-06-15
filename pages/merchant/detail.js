@@ -301,9 +301,42 @@ Page({
             })
             .get()
             .then(res => {
-                this.setData({
-                    isFavorite: res.data && res.data.length > 0
-                })
+                // 设置收藏状态
+                const isFavorite = res.data && res.data.length > 0
+                this.setData({ isFavorite: isFavorite })
+
+                // 如果发现重复收藏记录，自动清理
+                if (res.data && res.data.length > 1) {
+                    console.log(`发现重复收藏记录，保留最新的一条，删除其余 ${res.data.length - 1} 条`)
+
+                    // 按时间排序，找出最新的一条
+                    const sortedRecords = [...res.data].sort((a, b) => {
+                        // 如果有timestamp字段，按timestamp排序
+                        if (a.timestamp && b.timestamp) {
+                            return b.timestamp - a.timestamp
+                        }
+                        // 否则按_id排序（假设_id越大越新）
+                        return b._id > a._id ? 1 : -1
+                    })
+
+                    // 保留最新的一条，删除其他记录
+                    const keepRecord = sortedRecords[0]
+                    const deleteRecords = sortedRecords.slice(1)
+
+                    // 创建删除任务
+                    const deleteTasks = deleteRecords.map(record => {
+                        return db.collection('favorites').doc(record._id).remove()
+                    })
+
+                    // 执行删除任务
+                    Promise.all(deleteTasks)
+                        .then(() => {
+                            console.log('成功清理重复收藏记录')
+                        })
+                        .catch(err => {
+                            console.error('清理重复收藏记录失败', err)
+                        })
+                }
             })
     },
 
@@ -576,7 +609,19 @@ Page({
                 .get()
                 .then(res => {
                     if (res.data && res.data.length > 0) {
-                        return db.collection('favorites').doc(res.data[0]._id).remove()
+                        // 如果有多条收藏记录，删除所有记录
+                        if (res.data.length > 1) {
+                            console.log(`发现重复收藏记录，删除全部 ${res.data.length} 条记录`)
+                            // 创建删除任务数组
+                            const deleteTasks = res.data.map(item => {
+                                return db.collection('favorites').doc(item._id).remove()
+                            })
+                            // 执行所有删除任务
+                            return Promise.all(deleteTasks)
+                        } else {
+                            // 只有一条记录，直接删除
+                            return db.collection('favorites').doc(res.data[0]._id).remove()
+                        }
                     }
                     return Promise.reject('未找到收藏记录')
                 })
@@ -588,6 +633,10 @@ Page({
                     })
                 })
                 .catch(err => {
+                    if (err === '未找到收藏记录') {
+                        this.setData({ isFavorite: false })
+                        return
+                    }
                     console.error('取消收藏失败', err)
                     wx.showToast({
                         title: '操作失败',
@@ -595,26 +644,49 @@ Page({
                     })
                 })
         } else {
-            // 添加收藏
-            db.collection('favorites').add({
-                data: {
+            // 添加收藏前先检查是否已经收藏过
+            db.collection('favorites')
+                .where({
                     merchantId: this.data.merchantId,
-                    userOpenId: this.data.userOpenid,
-                    timestamp: db.serverDate()
-                }
-            }).then(() => {
-                this.setData({ isFavorite: true })
-                wx.showToast({
-                    title: '收藏成功',
-                    icon: 'success'
+                    userOpenId: this.data.userOpenid
                 })
-            }).catch(err => {
-                console.error('收藏失败', err)
-                wx.showToast({
-                    title: '操作失败',
-                    icon: 'none'
+                .get()
+                .then(res => {
+                    if (res.data && res.data.length > 0) {
+                        // 已经收藏过，不重复添加
+                        console.log('该商家已经收藏过了')
+                        this.setData({ isFavorite: true })
+                        wx.showToast({
+                            title: '已收藏',
+                            icon: 'success'
+                        })
+                        return Promise.reject('已收藏')
+                    }
+
+                    // 没有收藏记录，添加新收藏
+                    return db.collection('favorites').add({
+                        data: {
+                            merchantId: this.data.merchantId,
+                            userOpenId: this.data.userOpenid,
+                            timestamp: db.serverDate()
+                        }
+                    })
                 })
-            })
+                .then(() => {
+                    this.setData({ isFavorite: true })
+                    wx.showToast({
+                        title: '收藏成功',
+                        icon: 'success'
+                    })
+                })
+                .catch(err => {
+                    if (err === '已收藏') return
+                    console.error('收藏失败', err)
+                    wx.showToast({
+                        title: '操作失败',
+                        icon: 'none'
+                    })
+                })
         }
     },
 

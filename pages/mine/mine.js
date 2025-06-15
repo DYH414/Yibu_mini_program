@@ -21,6 +21,9 @@ Page({
 
     onLoad: function (options) {
         this.checkLoginStatus()
+
+        // 清理所有用户的重复收藏记录
+        this.cleanAllDuplicates()
     },
 
     onShow: function () {
@@ -141,16 +144,26 @@ Page({
     getDataCounts: function () {
         const userOpenId = app.globalData.userInfo.openid
 
-        // 获取收藏数量
+        // 获取收藏数量 - 修改为只统计不同商家的收藏数量
         db.collection('favorites')
             .where({
                 userOpenId: userOpenId
             })
-            .count()
+            .get()
             .then(res => {
-                this.setData({
-                    favoriteCount: res.total
+                // 使用Set来存储已收藏的商家ID，自动去重
+                const merchantIds = new Set()
+                res.data.forEach(favorite => {
+                    merchantIds.add(favorite.merchantId)
                 })
+
+                // Set的size属性即为不同商家的数量
+                this.setData({
+                    favoriteCount: merchantIds.size
+                })
+            })
+            .catch(err => {
+                console.error('获取收藏数量失败', err)
             })
 
         // 获取评论数量
@@ -210,8 +223,46 @@ Page({
                     return
                 }
 
-                // 获取所有商家ID
-                const merchantIds = favorites.map(item => item.merchantId)
+                // 检查是否有重复收藏记录，并进行处理
+                const merchantIdMap = new Map() // 用于存储商家ID到收藏记录的映射
+                const uniqueFavorites = [] // 存储去重后的收藏记录
+                const duplicates = [] // 存储需要删除的重复记录ID
+
+                // 遍历所有收藏记录，保留每个商家最新的收藏记录
+                favorites.forEach(favorite => {
+                    const merchantId = favorite.merchantId
+
+                    if (!merchantIdMap.has(merchantId)) {
+                        // 第一次出现的商家，添加到唯一收藏列表
+                        merchantIdMap.set(merchantId, favorite)
+                        uniqueFavorites.push(favorite)
+                    } else {
+                        // 重复出现的商家，记录为重复项
+                        duplicates.push(favorite._id)
+                    }
+                })
+
+                // 如果有重复收藏，自动清理
+                if (duplicates.length > 0) {
+                    console.log(`发现 ${duplicates.length} 条重复收藏记录，正在清理...`)
+
+                    // 创建删除任务
+                    const deleteTasks = duplicates.map(id => {
+                        return db.collection('favorites').doc(id).remove()
+                    })
+
+                    // 执行删除任务
+                    Promise.all(deleteTasks)
+                        .then(() => {
+                            console.log('成功清理重复收藏记录')
+                        })
+                        .catch(err => {
+                            console.error('清理重复收藏记录失败', err)
+                        })
+                }
+
+                // 获取所有商家ID（使用去重后的收藏记录）
+                const merchantIds = uniqueFavorites.map(item => item.merchantId)
 
                 // 批量获取商家信息
                 const tasks = merchantIds.map(id => {
@@ -222,7 +273,7 @@ Page({
                 Promise.all(tasks)
                     .then(results => {
                         // 将商家信息添加到收藏数据中
-                        const favoritesWithMerchant = favorites.map((favorite, index) => {
+                        const favoritesWithMerchant = uniqueFavorites.map((favorite, index) => {
                             return {
                                 ...favorite,
                                 merchant: results[index].data
@@ -624,6 +675,24 @@ Page({
                     title: '拨号取消',
                     icon: 'none'
                 })
+            }
+        })
+    },
+
+    // 清理所有用户的重复收藏记录
+    cleanAllDuplicates: function () {
+        // 调用云函数清理重复收藏
+        wx.cloud.callFunction({
+            name: 'cleanAllDuplicates',
+            success: res => {
+                console.log('清理重复收藏成功:', res.result)
+                if (res.result.deleted > 0) {
+                    // 如果有删除记录，重新加载数据
+                    this.loadUserData()
+                }
+            },
+            fail: err => {
+                console.error('清理重复收藏失败:', err)
             }
         })
     }
