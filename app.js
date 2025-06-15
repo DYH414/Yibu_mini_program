@@ -57,6 +57,11 @@ App({
                     this.globalData.openid = null;
                 }
             });
+        } else {
+            // 未登录，确保全局状态一致
+            this.globalData.isLogin = false;
+            this.globalData.userInfo = null;
+            this.globalData.openid = null;
         }
     },
 

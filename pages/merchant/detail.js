@@ -40,6 +40,11 @@ Page({
         }
     },
 
+    onShow: function () {
+        // 每次页面显示时重新检查登录状态
+        this.checkLoginStatus()
+    },
+
     onPullDownRefresh: function () {
         this.loadMerchantData()
     },
@@ -54,7 +59,7 @@ Page({
             userOpenid: openid || ''
         })
 
-        if (isLogin) {
+        if (isLogin && openid) {
             this.checkUserRating()
             this.checkFavoriteStatus()
         }

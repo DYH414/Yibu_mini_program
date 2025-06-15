@@ -555,7 +555,16 @@ Page({
             content: '确定要退出登录吗？',
             success: res => {
                 if (res.confirm) {
+                    // 清除全局数据
                     app.globalData.userInfo = null
+                    app.globalData.isLogin = false
+                    app.globalData.openid = null
+
+                    // 清除本地存储
+                    wx.removeStorageSync('openid')
+                    wx.removeStorageSync('userInfo')
+
+                    // 更新页面状态
                     this.setData({
                         isLogin: false,
                         userInfo: {},
@@ -564,6 +573,7 @@ Page({
                         commentCount: 0,
                         ratingCount: 0
                     })
+
                     wx.showToast({
                         title: '已退出登录',
                         icon: 'success'
