@@ -16,7 +16,7 @@ Page({
         loading: true,
         activeTab: 'favorite', // 当前激活的标签页：favorite, comment, rating
         showContactModal: false,
-        phoneNumber: '13800138000'
+        phoneNumber: '17805978513'
     },
 
     onLoad: function (options) {
