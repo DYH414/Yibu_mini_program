@@ -34,6 +34,17 @@ App({
                 success: res => {
                     console.log('获取用户信息成功:', res.data);
 
+                    // 确保数据完整性
+                    if (!res.data || !res.data._id) {
+                        console.error('用户数据不完整:', res.data);
+                        wx.removeStorageSync('openid');
+                        wx.removeStorageSync('userInfo');
+                        this.globalData.isLogin = false;
+                        this.globalData.userInfo = null;
+                        this.globalData.openid = null;
+                        return;
+                    }
+
                     // 确保使用最新的用户信息
                     this.globalData.userInfo = res.data;
                     this.globalData.isLogin = true;
@@ -41,6 +52,7 @@ App({
 
                     // 更新本地存储中的用户信息
                     wx.setStorageSync('userInfo', res.data);
+                    console.log('全局用户信息已更新:', this.globalData.userInfo);
 
                     // 如果有回调函数，执行回调
                     if (this.userInfoReadyCallback) {
@@ -59,6 +71,7 @@ App({
             });
         } else {
             // 未登录，确保全局状态一致
+            console.log('未登录，清除用户信息');
             this.globalData.isLogin = false;
             this.globalData.userInfo = null;
             this.globalData.openid = null;

@@ -13,7 +13,7 @@ exports.main = async (event, context) => {
 
     // 分类映射表
     const categoryMapping = {
-        '正餐': 'fast-food',
+        '快餐': 'fast-food',
         '小吃': 'snack',
         '汉堡': 'burger',
         '奶茶': 'milk-tea',

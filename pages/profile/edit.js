@@ -12,13 +12,17 @@ Page({
     onLoad: function (options) {
         // 获取用户信息
         const userInfo = app.globalData.userInfo;
-        if (userInfo) {
+        console.log('编辑页面加载，用户信息:', userInfo);
+
+        if (userInfo && userInfo._id) {
             this.setData({
                 userInfo: userInfo,
                 nickname: userInfo.nickname || '',
                 avatarUrl: userInfo.avatarUrl || '/images/default-avatar.png'
             });
+            console.log('设置页面数据成功，用户ID:', userInfo._id);
         } else {
+            console.error('用户未登录或用户信息不完整');
             wx.showToast({
                 title: '请先登录',
                 icon: 'none',
@@ -77,7 +81,21 @@ Page({
         }
 
         // 如果头像变化了，先上传头像
-        const cloudPath = `avatars/${userInfo.openid}_${Date.now()}.jpg`;
+        // 获取用户ID，应该使用_id作为文档ID
+        const userId = userInfo._id;
+
+        if (!userId) {
+            console.error('无法获取用户ID');
+            this.setData({ isLoading: false });
+            wx.showToast({
+                title: '保存失败，请重新登录',
+                icon: 'none'
+            });
+            return;
+        }
+
+        const cloudPath = `avatars/${userId}_${Date.now()}.jpg`;
+        console.log('上传头像，路径:', cloudPath);
 
         wx.cloud.uploadFile({
             cloudPath: cloudPath,
@@ -85,6 +103,8 @@ Page({
             success: res => {
                 // 上传成功，获取文件ID
                 const fileID = res.fileID;
+                console.log('头像上传成功，fileID:', fileID);
+
                 // 更新用户信息
                 this.updateUserInfo({
                     nickname: nickname,
@@ -105,8 +125,22 @@ Page({
     // 更新用户信息
     updateUserInfo: function (data) {
         const userInfo = this.data.userInfo;
+        // 获取用户ID，应该使用_id作为文档ID
+        const userId = userInfo._id;
 
-        db.collection('users').doc(userInfo.openid).update({
+        if (!userId) {
+            console.error('无法获取用户ID');
+            this.setData({ isLoading: false });
+            wx.showToast({
+                title: '保存失败，请重新登录',
+                icon: 'none'
+            });
+            return;
+        }
+
+        console.log('更新用户信息，用户ID:', userId);
+
+        db.collection('users').doc(userId).update({
             data: data
         }).then(() => {
             // 更新全局用户信息
@@ -114,6 +148,9 @@ Page({
                 ...userInfo,
                 ...data
             };
+
+            // 更新本地存储
+            wx.setStorageSync('userInfo', app.globalData.userInfo);
 
             this.setData({ isLoading: false });
 
