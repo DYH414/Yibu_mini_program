@@ -13,6 +13,72 @@ App({
 
         // 获取用户信息
         this.checkLoginStatus();
+
+        // 初始化缓存服务
+        this.initCacheService();
+    },
+
+    // 初始化缓存服务
+    initCacheService: function () {
+        this.cache = {
+            // 缓存数据
+            data: {},
+            // 缓存时间记录
+            timestamps: {},
+            // 默认缓存时间（5分钟）
+            defaultExpireTime: 5 * 60 * 1000,
+
+            // 设置缓存
+            set: function (key, value, expireTime = this.defaultExpireTime) {
+                this.data[key] = value;
+                this.timestamps[key] = {
+                    time: Date.now(),
+                    expire: expireTime
+                };
+            },
+
+            // 获取缓存
+            get: function (key) {
+                const now = Date.now();
+                const timestamp = this.timestamps[key];
+
+                // 检查缓存是否存在且未过期
+                if (timestamp && (now - timestamp.time < timestamp.expire)) {
+                    return this.data[key];
+                }
+
+                // 缓存不存在或已过期
+                return null;
+            },
+
+            // 清除指定缓存
+            remove: function (key) {
+                delete this.data[key];
+                delete this.timestamps[key];
+            },
+
+            // 清除所有缓存
+            clear: function () {
+                this.data = {};
+                this.timestamps = {};
+            },
+
+            // 清除过期缓存
+            clearExpired: function () {
+                const now = Date.now();
+                for (const key in this.timestamps) {
+                    const timestamp = this.timestamps[key];
+                    if (now - timestamp.time >= timestamp.expire) {
+                        this.remove(key);
+                    }
+                }
+            }
+        };
+
+        // 定期清理过期缓存（每10分钟）
+        setInterval(() => {
+            this.cache.clearExpired();
+        }, 10 * 60 * 1000);
     },
 
     // 全局数据

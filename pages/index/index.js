@@ -144,11 +144,33 @@ Page({
     loadMerchants: function () {
         console.log('加载商家数据，分类:', this.data.currentCategory, '排序:', this.data.sortBy, '页码:', this.data.page)
 
+        // 获取app实例
+        const app = getApp();
+
         // 清空现有数据，避免下拉刷新时显示旧数据
         if (this.data.isRefreshing || this.data.page === 1) {
             this.setData({
                 merchants: []
             })
+        }
+
+        // 构建缓存键
+        const cacheKey = `merchants_${this.data.currentCategory}_${this.data.sortBy}_${this.data.page}`;
+
+        // 尝试从缓存获取数据
+        if (!this.data.isRefreshing && this.data.page === 1) {
+            const cachedData = app.cache.get(cacheKey);
+            if (cachedData) {
+                console.log('使用缓存数据:', cacheKey);
+                this.setData({
+                    merchants: cachedData,
+                    originalMerchants: cachedData,
+                    loading: false,
+                    isRefreshing: false,
+                    hasMore: cachedData.length === this.data.pageSize
+                });
+                return;
+            }
         }
 
         let query = db.collection('merchants')
@@ -189,34 +211,11 @@ Page({
                     return
                 }
 
-                // 加载每个商家的评分信息
-                const tasks = merchants.map(merchant => {
-                    return db.collection('ratings')
-                        .where({
-                            merchantId: merchant._id
-                        })
-                        .get()
-                        .then(ratingRes => {
-                            const ratings = ratingRes.data
-                            const ratingCount = ratings.length
-                            let avgRating = 0
+                // 获取商家ID列表
+                const merchantIds = merchants.map(merchant => merchant._id);
 
-                            if (ratingCount > 0) {
-                                const totalScore = ratings.reduce((sum, rating) => sum + rating.score, 0)
-                                avgRating = (totalScore / ratingCount).toFixed(1)
-                            }
-
-                            merchant.ratingCount = ratingCount
-                            merchant.avgRating = avgRating
-
-                            // 生成星星数组
-                            merchant.starArray = this.generateStarArray(avgRating)
-
-                            return merchant
-                        })
-                })
-
-                Promise.all(tasks).then(updatedMerchants => {
+                // 批量获取评分数据
+                this.batchGetRatings(merchantIds, merchants).then(updatedMerchants => {
                     // 如果是按评分排序，再次排序
                     if (this.data.sortBy === 'rating') {
                         updatedMerchants.sort((a, b) => b.avgRating - a.avgRating)
@@ -226,6 +225,7 @@ Page({
                     const currentMerchants = this.data.page === 1 ? [] : this.data.merchants
                     const newMerchants = [...currentMerchants, ...updatedMerchants]
 
+                    // 更新数据
                     this.setData({
                         merchants: newMerchants,
                         originalMerchants: newMerchants, // 保存原始数据用于搜索
@@ -234,10 +234,22 @@ Page({
                         hasMore: updatedMerchants.length === this.data.pageSize
                     })
 
+                    // 如果是第一页，缓存结果
+                    if (this.data.page === 1) {
+                        app.cache.set(cacheKey, newMerchants);
+                    }
+
                     console.log('数据加载完成，停止下拉刷新')
                     // 停止下拉刷新动画
                     wx.stopPullDownRefresh()
-                })
+                }).catch(err => {
+                    console.error('处理评分数据失败', err)
+                    this.setData({
+                        loading: false,
+                        isRefreshing: false
+                    })
+                    wx.stopPullDownRefresh()
+                });
             })
             .catch(err => {
                 console.error('加载商家数据失败', err)
@@ -255,6 +267,82 @@ Page({
                 // 停止下拉刷新动画
                 wx.stopPullDownRefresh()
             })
+    },
+
+    /**
+     * 批量获取评分数据
+     * @param {Array} merchantIds - 商家ID列表
+     * @param {Array} merchants - 商家数据列表
+     * @return {Promise} 更新后的商家数据
+     */
+    batchGetRatings: function (merchantIds, merchants) {
+        // 获取app实例
+        const app = getApp();
+
+        // 尝试从缓存获取评分数据
+        const cacheKey = `ratings_${merchantIds.join('_')}`;
+        const cachedRatings = app.cache.get(cacheKey);
+
+        if (cachedRatings) {
+            console.log('使用缓存的评分数据');
+            // 使用缓存的评分数据更新商家信息
+            return Promise.resolve(merchants.map(merchant => {
+                const merchantRatings = cachedRatings[merchant._id] || [];
+                const ratingCount = merchantRatings.length;
+                let avgRating = 0;
+
+                if (ratingCount > 0) {
+                    const totalScore = merchantRatings.reduce((sum, rating) => sum + rating.score, 0);
+                    avgRating = (totalScore / ratingCount).toFixed(1);
+                }
+
+                merchant.ratingCount = ratingCount;
+                merchant.avgRating = avgRating;
+                merchant.starArray = this.generateStarArray(avgRating);
+
+                return merchant;
+            }));
+        }
+
+        // 缓存不存在，从数据库获取评分数据
+        return db.collection('ratings')
+            .where({
+                merchantId: db.command.in(merchantIds)
+            })
+            .get()
+            .then(res => {
+                const ratings = res.data;
+
+                // 按商家ID分组评分数据
+                const ratingsByMerchant = {};
+                ratings.forEach(rating => {
+                    if (!ratingsByMerchant[rating.merchantId]) {
+                        ratingsByMerchant[rating.merchantId] = [];
+                    }
+                    ratingsByMerchant[rating.merchantId].push(rating);
+                });
+
+                // 缓存评分数据
+                app.cache.set(cacheKey, ratingsByMerchant, 10 * 60 * 1000); // 10分钟缓存
+
+                // 更新商家信息
+                return merchants.map(merchant => {
+                    const merchantRatings = ratingsByMerchant[merchant._id] || [];
+                    const ratingCount = merchantRatings.length;
+                    let avgRating = 0;
+
+                    if (ratingCount > 0) {
+                        const totalScore = merchantRatings.reduce((sum, rating) => sum + rating.score, 0);
+                        avgRating = (totalScore / ratingCount).toFixed(1);
+                    }
+
+                    merchant.ratingCount = ratingCount;
+                    merchant.avgRating = avgRating;
+                    merchant.starArray = this.generateStarArray(avgRating);
+
+                    return merchant;
+                });
+            });
     },
 
     // 加载更多商家数据

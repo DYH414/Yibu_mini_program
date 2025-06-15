@@ -60,8 +60,8 @@ Page({
         // 获取用户登录状态
         this.checkLoginStatus();
 
-        // 加载商家信息
-        this.loadMerchantData();
+        // 使用云函数加载商家详情（优化性能）
+        this.loadMerchantDetailWithCloud();
     },
 
     onShow: function () {
@@ -89,71 +89,224 @@ Page({
         }
     },
 
+    // 使用云函数加载商家详情
+    loadMerchantDetailWithCloud: function () {
+        this.setData({ loading: true });
+
+        // 获取app实例
+        const app = getApp();
+
+        // 构建缓存键
+        const cacheKey = `merchant_detail_cloud_${this.data.merchantId}`;
+
+        // 尝试从缓存获取数据
+        const cachedData = app.cache.get(cacheKey);
+        if (cachedData) {
+            console.log('使用缓存的商家详情数据(云函数)');
+            this.setData({
+                merchant: cachedData.merchant,
+                platforms: cachedData.merchant.platforms || [],
+                ratingStars: this.generateRatingStars(cachedData.merchant.avgRating),
+                comments: cachedData.comments,
+                userRating: cachedData.userRating,
+                isFavorite: cachedData.isFavorite,
+                loading: false,
+                commentLoading: false
+            });
+
+            wx.stopPullDownRefresh();
+            return;
+        }
+
+        // 调用云函数获取商家详情
+        wx.cloud.callFunction({
+            name: 'getMerchantDetail',
+            data: {
+                merchantId: this.data.merchantId
+            }
+        }).then(res => {
+            console.log('云函数获取商家详情成功:', res);
+
+            if (res.result && res.result.success) {
+                const data = res.result.data;
+
+                // 生成评分星星数组
+                const ratingStars = this.generateRatingStars(data.merchant.avgRating);
+
+                // 处理评论数据
+                const processedComments = this.processComments(data.comments);
+
+                // 更新页面数据
+                this.setData({
+                    merchant: data.merchant,
+                    platforms: data.merchant.platforms || [],
+                    ratingStars: ratingStars,
+                    comments: processedComments,
+                    userRating: data.userRating,
+                    isFavorite: data.isFavorite,
+                    loading: false,
+                    commentLoading: false
+                });
+
+                // 缓存数据
+                app.cache.set(cacheKey, {
+                    merchant: data.merchant,
+                    comments: processedComments,
+                    userRating: data.userRating,
+                    isFavorite: data.isFavorite
+                }, 5 * 60 * 1000); // 5分钟缓存
+            } else {
+                console.error('云函数返回错误:', res.result);
+                // 如果云函数调用失败，回退到分步加载
+                this.loadMerchantData();
+            }
+
+            wx.stopPullDownRefresh();
+        }).catch(err => {
+            console.error('调用云函数失败:', err);
+            // 如果云函数调用失败，回退到分步加载
+            this.loadMerchantData();
+            wx.stopPullDownRefresh();
+        });
+    },
+
     // 加载商家数据
     loadMerchantData: function () {
-        this.setData({ loading: true })
+        this.setData({ loading: true });
+
+        // 获取app实例
+        const app = getApp();
+
+        // 构建缓存键
+        const cacheKey = `merchant_detail_${this.data.merchantId}`;
+
+        // 尝试从缓存获取数据
+        const cachedData = app.cache.get(cacheKey);
+        if (cachedData) {
+            console.log('使用缓存的商家详情数据');
+            this.setData({
+                merchant: cachedData.merchant,
+                platforms: cachedData.platforms || [],
+                ratingStars: cachedData.ratingStars,
+                loading: false
+            });
+
+            // 分阶段加载其他数据
+            setTimeout(() => {
+                // 加载评论数据
+                this.loadComments();
+
+                // 检查用户评分和收藏状态
+                if (this.data.isLogin && this.data.userOpenid) {
+                    this.checkUserRating();
+                    this.checkFavoriteStatus();
+                }
+            }, 100);
+
+            wx.stopPullDownRefresh();
+            return;
+        }
 
         db.collection('merchants').doc(this.data.merchantId).get()
             .then(res => {
-                const merchant = res.data
+                const merchant = res.data;
 
-                // 加载平台数据
+                // 设置基本商家信息
                 this.setData({
                     merchant: merchant,
                     platforms: merchant.platforms || []
-                })
+                });
 
-                // 加载评分数据
-                this.loadRatingData()
+                // 分阶段加载：先加载评分数据
+                this.loadRatingData().then(() => {
+                    // 缓存商家详情数据
+                    app.cache.set(cacheKey, {
+                        merchant: this.data.merchant,
+                        platforms: this.data.platforms,
+                        ratingStars: this.data.ratingStars
+                    }, 10 * 60 * 1000); // 10分钟缓存
 
-                // 加载评论数据
-                this.loadComments()
+                    // 再加载评论数据
+                    setTimeout(() => {
+                        this.loadComments();
+                    }, 100);
+                });
             })
             .catch(err => {
-                console.error('获取商家信息失败', err)
-                this.setData({ loading: false })
-                wx.stopPullDownRefresh()
+                console.error('获取商家信息失败', err);
+                this.setData({ loading: false });
+                wx.stopPullDownRefresh();
                 wx.showToast({
                     title: '获取商家信息失败',
                     icon: 'none'
-                })
-            })
+                });
+            });
     },
 
     // 加载评分数据
     loadRatingData: function () {
-        db.collection('ratings')
+        // 获取app实例
+        const app = getApp();
+
+        // 构建缓存键
+        const cacheKey = `merchant_ratings_${this.data.merchantId}`;
+
+        // 尝试从缓存获取数据
+        const cachedRatings = app.cache.get(cacheKey);
+        if (cachedRatings) {
+            console.log('使用缓存的评分数据');
+            this.setData({
+                'merchant.ratingCount': cachedRatings.ratingCount,
+                'merchant.avgRating': cachedRatings.avgRating,
+                ratingStars: cachedRatings.ratingStars,
+                loading: false
+            });
+
+            wx.stopPullDownRefresh();
+            return Promise.resolve();
+        }
+
+        return db.collection('ratings')
             .where({
                 merchantId: this.data.merchantId
             })
             .get()
             .then(res => {
-                const ratings = res.data
-                const ratingCount = ratings.length
-                let avgRating = 0
+                const ratings = res.data;
+                const ratingCount = ratings.length;
+                let avgRating = 0;
 
                 if (ratingCount > 0) {
-                    const totalScore = ratings.reduce((sum, rating) => sum + rating.score, 0)
-                    avgRating = (totalScore / ratingCount).toFixed(1)
+                    const totalScore = ratings.reduce((sum, rating) => sum + rating.score, 0);
+                    avgRating = (totalScore / ratingCount).toFixed(1);
                 }
 
                 // 生成评分星星数组
-                const ratingStars = this.generateRatingStars(avgRating)
+                const ratingStars = this.generateRatingStars(avgRating);
+
+                // 缓存评分数据
+                app.cache.set(cacheKey, {
+                    ratingCount,
+                    avgRating,
+                    ratingStars
+                }, 5 * 60 * 1000); // 5分钟缓存
 
                 this.setData({
                     'merchant.ratingCount': ratingCount,
                     'merchant.avgRating': avgRating,
                     ratingStars: ratingStars,
                     loading: false
-                })
+                });
 
-                wx.stopPullDownRefresh()
+                wx.stopPullDownRefresh();
+                return Promise.resolve();
             })
             .catch(err => {
-                console.error('获取评分信息失败', err)
-                this.setData({ loading: false })
-                wx.stopPullDownRefresh()
-            })
+                console.error('获取评分信息失败', err);
+                this.setData({ loading: false });
+                wx.stopPullDownRefresh();
+                return Promise.reject(err);
+            });
     },
 
     // 生成评分星星数组
@@ -186,7 +339,28 @@ Page({
 
     // 加载评论数据
     loadComments: function () {
-        this.setData({ commentLoading: true })
+        this.setData({ commentLoading: true });
+
+        // 获取app实例
+        const app = getApp();
+
+        // 构建缓存键
+        const cacheKey = `merchant_comments_${this.data.merchantId}`;
+
+        // 尝试从缓存获取数据
+        const cachedComments = app.cache.get(cacheKey);
+        if (cachedComments) {
+            console.log('使用缓存的评论数据');
+
+            // 处理评论的点赞状态
+            const processedComments = this.processComments(cachedComments);
+
+            this.setData({
+                comments: processedComments,
+                commentLoading: false
+            });
+            return;
+        }
 
         db.collection('comments')
             .where({
@@ -195,7 +369,10 @@ Page({
             .orderBy('likes', 'desc')
             .get()
             .then(res => {
-                const comments = res.data
+                const comments = res.data;
+
+                // 缓存评论数据
+                app.cache.set(cacheKey, comments, 3 * 60 * 1000); // 3分钟缓存
 
                 if (comments.length === 0) {
                     this.setData({
@@ -205,94 +382,20 @@ Page({
                     return;
                 }
 
-                // 收集所有评论的用户openid
-                const userOpenIds = [...new Set(comments.map(comment => comment.userOpenId))];
+                // 处理评论数据
+                const processedComments = this.processComments(comments);
 
-                // 批量获取用户信息
-                const userPromises = userOpenIds.map(openid => {
-                    return db.collection('users').doc(openid).get()
-                        .then(userRes => {
-                            return {
-                                openid: openid,
-                                userInfo: userRes.data
-                            };
-                        })
-                        .catch(err => {
-                            console.error(`获取用户 ${openid} 信息失败:`, err);
-                            return {
-                                openid: openid,
-                                userInfo: {
-                                    nickname: '用户',
-                                    avatarUrl: '/images/default-avatar.png'
-                                }
-                            };
-                        });
-                });
-
-                // 等待所有用户信息获取完成
-                Promise.all(userPromises).then(usersData => {
-                    // 将用户信息转换为以openid为键的对象，方便查找
-                    const usersMap = {};
-                    usersData.forEach(userData => {
-                        usersMap[userData.openid] = userData.userInfo;
-                    });
-
-                    // 处理评论数据，关联最新的用户信息
-                    const processedComments = comments.map(comment => {
-                        // 获取该评论对应的最新用户信息
-                        const userInfo = usersMap[comment.userOpenId] || {
-                            nickname: comment.userNickname || '用户',
-                            avatarUrl: comment.userAvatarUrl || '/images/default-avatar.png'
-                        };
-
-                        // 当前用户是否点赞过
-                        const isLiked = comment.likedBy && comment.likedBy.includes(this.data.userOpenid);
-
-                        return {
-                            ...comment,
-                            user: {
-                                nickname: userInfo.nickname,
-                                avatarUrl: userInfo.avatarUrl
-                            },
-                            isLiked: isLiked,
-                            animating: false // 初始化动画状态
-                        };
-                    });
-
-                    this.setData({
-                        comments: processedComments,
-                        commentLoading: false
-                    });
-                }).catch(err => {
-                    console.error('处理用户信息失败:', err);
-
-                    // 如果获取用户信息失败，使用评论中保存的用户信息
-                    const fallbackComments = comments.map(comment => {
-                        const user = {
-                            nickname: comment.userNickname || '用户',
-                            avatarUrl: comment.userAvatarUrl || '/images/default-avatar.png'
-                        };
-
-                        const isLiked = comment.likedBy && comment.likedBy.includes(this.data.userOpenid);
-
-                        return {
-                            ...comment,
-                            user: user,
-                            isLiked: isLiked,
-                            animating: false // 初始化动画状态
-                        };
-                    });
-
-                    this.setData({
-                        comments: fallbackComments,
-                        commentLoading: false
-                    });
+                this.setData({
+                    comments: processedComments,
+                    commentLoading: false
                 });
             })
             .catch(err => {
-                console.error('获取评论失败', err)
-                this.setData({ commentLoading: false })
-            })
+                console.error('获取评论失败', err);
+                this.setData({
+                    commentLoading: false
+                });
+            });
     },
 
     // 检查用户评分
@@ -770,6 +873,34 @@ Page({
                     icon: 'success'
                 });
             }
+        });
+    },
+
+    // 处理评论数据，添加点赞状态
+    processComments: function (comments) {
+        const userOpenid = this.data.userOpenid;
+
+        return comments.map(comment => {
+            // 添加用户点赞状态
+            const isLiked = comment.likedBy && comment.likedBy.includes(userOpenid);
+
+            // 获取用户信息
+            let user = {
+                nickname: comment.userNickname || '微信用户',
+                avatarUrl: comment.userAvatarUrl || '/images/default-avatar.png'
+            };
+
+            // 如果评论中包含完整的用户信息，则使用它
+            if (comment.user) {
+                user = comment.user;
+            }
+
+            return {
+                ...comment,
+                isLiked: isLiked,
+                user: user,
+                animating: false
+            };
         });
     }
 }) 

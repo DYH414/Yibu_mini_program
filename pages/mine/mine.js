@@ -225,6 +225,19 @@ Page({
 
         console.log('加载收藏数据，用户ID:', userOpenId);
 
+        // 尝试从缓存获取数据
+        const cacheKey = `user_favorites_${userOpenId}`;
+        const cachedData = app.cache.get(cacheKey);
+
+        if (cachedData) {
+            console.log('使用缓存的收藏数据');
+            this.setData({
+                favorites: cachedData,
+                loading: false
+            });
+            return;
+        }
+
         db.collection('favorites')
             .where({
                 userOpenId: userOpenId
@@ -265,61 +278,86 @@ Page({
 
                 // 如果有重复收藏，自动清理
                 if (duplicates.length > 0) {
-                    console.log(`发现 ${duplicates.length} 条重复收藏记录，正在清理...`)
+                    console.log(`发现 ${duplicates.length} 条重复收藏记录，正在清理...`);
 
                     // 使用云函数清理重复收藏，而不是直接在客户端删除
                     wx.cloud.callFunction({
                         name: 'cleanAllDuplicates',
                         success: res => {
-                            console.log('清理重复收藏成功:', res.result)
+                            console.log('清理重复收藏成功:', res.result);
                         },
                         fail: err => {
-                            console.error('清理重复收藏失败:', err)
+                            console.error('清理重复收藏失败:', err);
                         }
-                    })
+                    });
                 }
 
                 // 获取所有商家ID（使用去重后的收藏记录）
-                const merchantIds = uniqueFavorites.map(item => item.merchantId)
+                const merchantIds = uniqueFavorites.map(item => item.merchantId);
 
                 // 批量获取商家信息
-                const tasks = merchantIds.map(id => {
-                    return db.collection('merchants').doc(id).get()
-                })
+                this.batchGetMerchants(merchantIds).then(merchants => {
+                    // 将商家信息添加到收藏数据中
+                    const favoritesWithMerchant = uniqueFavorites.map((favorite) => {
+                        const merchant = merchants.find(m => m._id === favorite.merchantId) || {};
+                        return {
+                            ...favorite,
+                            merchant: merchant
+                        };
+                    });
 
-                // 并行执行所有查询
-                Promise.all(tasks)
-                    .then(results => {
-                        // 将商家信息添加到收藏数据中
-                        const favoritesWithMerchant = uniqueFavorites.map((favorite, index) => {
-                            return {
-                                ...favorite,
-                                merchant: results[index].data
-                            }
-                        })
+                    // 缓存结果
+                    app.cache.set(cacheKey, favoritesWithMerchant, 3 * 60 * 1000); // 3分钟缓存
 
-                        this.setData({
-                            favorites: favoritesWithMerchant,
-                            loading: false
-                        })
-                    })
-                    .catch(err => {
-                        console.error('获取商家信息失败', err)
-                        this.setData({ loading: false })
-                        wx.showToast({
-                            title: '加载失败，请重试',
-                            icon: 'none'
-                        })
-                    })
+                    this.setData({
+                        favorites: favoritesWithMerchant,
+                        loading: false
+                    });
+                }).catch(err => {
+                    console.error('获取商家信息失败', err);
+                    this.setData({ loading: false });
+                    wx.showToast({
+                        title: '加载失败，请重试',
+                        icon: 'none'
+                    });
+                });
             })
             .catch(err => {
-                console.error('获取收藏失败', err)
-                this.setData({ loading: false })
+                console.error('获取收藏失败', err);
+                this.setData({ loading: false });
                 wx.showToast({
                     title: '加载失败，请重试',
                     icon: 'none'
-                })
-            })
+                });
+            });
+    },
+
+    // 批量获取商家信息
+    batchGetMerchants: function (merchantIds) {
+        // 尝试从缓存获取数据
+        const cacheKey = `batch_merchants_${merchantIds.join('_')}`;
+        const cachedData = app.cache.get(cacheKey);
+
+        if (cachedData) {
+            console.log('使用缓存的商家数据');
+            return Promise.resolve(cachedData);
+        }
+
+        // 批量获取商家信息
+        const tasks = merchantIds.map(id => {
+            return db.collection('merchants').doc(id).get();
+        });
+
+        // 并行执行所有查询
+        return Promise.all(tasks)
+            .then(results => {
+                const merchants = results.map(res => res.data);
+
+                // 缓存结果
+                app.cache.set(cacheKey, merchants, 10 * 60 * 1000); // 10分钟缓存
+
+                return merchants;
+            });
     },
 
     // 加载评论数据
