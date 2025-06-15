@@ -2,145 +2,92 @@
 const cloud = require('wx-server-sdk')
 
 cloud.init({
-    env: cloud.DYNAMIC_CURRENT_ENV
+    env: 'cloudbase-0gdnnqax782f54fa' // 您的云环境ID
 })
 
 const db = cloud.database()
-const _ = db.command
 const $ = db.command.aggregate
 
 // 云函数入口函数
 exports.main = async (event, context) => {
-    const { keyword, category = 'all', sortBy = 'default', page = 1, pageSize = 10 } = event
+    const { keyword, category, sortBy, page = 1, pageSize = 10 } = event
 
     try {
-        // 构建查询条件
-        const condition = {}
+        if (!keyword) {
+            return {
+                success: false,
+                message: '搜索关键词不能为空',
+                data: { merchants: [], total: 0 }
+            }
+        }
 
-        // 关键词搜索（支持商家名称和描述）
-        if (keyword && keyword.trim()) {
-            // 使用正则表达式进行模糊匹配，不区分大小写
-            const keywordRegex = new RegExp(keyword.trim(), 'i')
-            condition.$or = [
-                { name: keywordRegex },
-                { description: keywordRegex }
+        // 1. 构建匹配条件
+        const matchStage = {}
+        // 关键词模糊查询 (不区分大小写)
+        if (keyword) {
+            matchStage.$or = [
+                { name: db.RegExp({ regexp: keyword, options: 'i' }) },
+                { description: db.RegExp({ regexp: keyword, options: 'i' }) }
             ]
         }
-
-        // 分类过滤
+        // 分类匹配
         if (category && category !== 'all') {
-            condition.category = category
+            matchStage.category = category
         }
 
-        // 执行查询
-        const countResult = await db.collection('merchants')
-            .where(condition)
-            .count()
+        // 2. 聚合操作
+        const aggregate = db.collection('merchants').aggregate().match(matchStage)
 
-        const total = countResult.total
-
-        // 根据排序方式确定排序字段
-        let orderField = 'createTime'
-        if (sortBy === 'rating') {
-            orderField = 'avgRating'
-        }
-
-        // 查询商家数据
-        let merchantsQuery = db.collection('merchants')
-            .where(condition)
-            .skip((page - 1) * pageSize)
-            .limit(pageSize)
-
-        // 应用排序
-        merchantsQuery = merchantsQuery.orderBy(orderField, 'desc')
-
-        const merchantsResult = await merchantsQuery.get()
-        const merchants = merchantsResult.data
-
-        // 如果没有数据，直接返回
-        if (merchants.length === 0) {
-            return {
-                success: true,
-                data: {
-                    merchants: [],
-                    total,
-                    page,
-                    pageSize
-                }
-            }
-        }
-
-        // 获取商家ID列表
-        const merchantIds = merchants.map(merchant => merchant._id)
-
-        // 批量查询评分数据
-        const ratingsResult = await db.collection('ratings')
-            .where({
-                merchantId: _.in(merchantIds)
-            })
-            .get()
-
-        const ratings = ratingsResult.data
-
-        // 计算每个商家的平均评分
-        const merchantRatings = {}
-        ratings.forEach(rating => {
-            if (!merchantRatings[rating.merchantId]) {
-                merchantRatings[rating.merchantId] = {
-                    total: 0,
-                    count: 0
-                }
-            }
-            merchantRatings[rating.merchantId].total += rating.score
-            merchantRatings[rating.merchantId].count += 1
+        // 3. 关联 ratings 集合
+        aggregate.lookup({
+            from: 'ratings',
+            localField: '_id',
+            foreignField: 'merchantId',
+            as: 'ratingsData',
         })
 
-        // 更新商家数据，添加评分信息
-        const updatedMerchants = merchants.map(merchant => {
-            const rating = merchantRatings[merchant._id] || { total: 0, count: 0 }
-            const avgRating = rating.count > 0 ? (rating.total / rating.count).toFixed(1) : '0.0'
-
-            return {
-                ...merchant,
-                avgRating,
-                ratingCount: rating.count
-            }
+        // 4. 计算平均分和评分数
+        aggregate.addFields({
+            ratingCount: $.size('$ratingsData'),
+            avgRating: $.ifNull([$.avg('$ratingsData.score'), 0]), // 无评分时默认为0
         })
 
-        // 如果是按评分排序，再次排序
+        // 5. 处理排序
+        const sortStage = {}
         if (sortBy === 'rating') {
-            updatedMerchants.sort((a, b) => b.avgRating - a.avgRating)
+            sortStage.avgRating = -1
         }
+        // 默认按相关性(数据库默认)或创建时间排序
+        sortStage.createTime = -1
+        aggregate.sort(sortStage)
 
-        // 记录搜索日志（如果有关键词）
-        if (keyword && keyword.trim() && context.OPENID) {
-            try {
-                await db.collection('search_logs').add({
-                    data: {
-                        keyword: keyword.trim(),
-                        userOpenId: context.OPENID,
-                        timestamp: db.serverDate()
-                    }
-                })
-            } catch (logError) {
-                console.error('记录搜索日志失败', logError)
-            }
-        }
+        // 6. 分页查询，并获取总数
+        const facetRes = await aggregate.facet({
+            paginatedResults: [
+                { $skip: (page - 1) * pageSize },
+                { $limit: pageSize }
+            ],
+            totalCount: [
+                { $count: 'count' }
+            ]
+        }).end()
+
+        const merchants = facetRes.list[0].paginatedResults
+        const totalCount = facetRes.list[0].totalCount.length > 0 ? facetRes.list[0].totalCount[0].count : 0
 
         return {
             success: true,
             data: {
-                merchants: updatedMerchants,
-                total,
-                page,
-                pageSize
+                merchants: merchants,
+                total: totalCount,
             }
         }
     } catch (error) {
-        console.error('搜索失败', error)
+        console.error('搜索云函数执行失败', error)
         return {
             success: false,
-            error: error.message
+            message: '搜索服务异常，请稍后重试',
+            error: error
         }
     }
 } 

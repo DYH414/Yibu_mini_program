@@ -502,22 +502,43 @@ Page({
                         (this.data.page * this.data.pageSize) < total
                 })
 
-                // 显示搜索结果提示
-                if (updatedMerchants.length === 0) {
+                // 只有在第一页且没有结果时才提示
+                if (updatedMerchants.length === 0 && this.data.page === 1) {
                     wx.showToast({
                         title: '没有找到相关商家',
                         icon: 'none'
                     })
                 }
             } else {
-                this.handleSearchError()
+                // 即使云函数返回 success: false，也可能是因为没有结果，而不是真正的错误
+                // 除非有明确的错误信息，否则不提示"搜索失败"
+                console.warn('云函数搜索未成功:', res.result);
+                // 当没有结果时，云函数可能返回 success: false，此时应该清空列表
+                if (res.result && res.result.data && res.result.data.merchants.length === 0) {
+                    this.setData({
+                        merchants: [],
+                        loading: false,
+                        isRefreshing: false,
+                        hasMore: false
+                    });
+                    wx.showToast({
+                        title: '没有找到相关商家',
+                        icon: 'none'
+                    });
+                } else if (res.result && res.result.message) {
+                    // 如果有错误消息，显示它
+                    wx.showToast({
+                        title: res.result.message,
+                        icon: 'none'
+                    });
+                }
             }
 
             // 停止下拉刷新动画
             wx.stopPullDownRefresh()
         }).catch(err => {
             console.error('搜索失败', err)
-            this.handleSearchError()
+            this.handleSearchError() // 网络等调用错误，才显示失败
 
             // 停止下拉刷新动画
             wx.stopPullDownRefresh()
@@ -565,11 +586,16 @@ Page({
                         (this.data.page * this.data.pageSize) < total
                 })
             } else {
-                this.handleSearchError()
+                // 加载更多时，如果云函数返回非成功，一般意味着没有更多数据
+                console.warn('加载更多搜索结果未成功:', res.result);
+                this.setData({
+                    loading: false,
+                    hasMore: false
+                });
             }
         }).catch(err => {
             console.error('加载更多搜索结果失败', err)
-            this.handleSearchError()
+            this.handleSearchError() // 只有在真实网络错误时才提示
         })
     },
 
