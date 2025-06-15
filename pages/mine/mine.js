@@ -165,16 +165,26 @@ Page({
                 })
             })
 
-        // 获取评分数量
+        // 获取评分数量 - 修改为只统计不同商家的评分数量
         db.collection('ratings')
             .where({
                 userOpenId: userOpenId
             })
-            .count()
+            .get()
             .then(res => {
-                this.setData({
-                    ratingCount: res.total
+                // 使用Set来存储已评分的商家ID，自动去重
+                const merchantIds = new Set()
+                res.data.forEach(rating => {
+                    merchantIds.add(rating.merchantId)
                 })
+
+                // Set的size属性即为不同商家的数量
+                this.setData({
+                    ratingCount: merchantIds.size
+                })
+            })
+            .catch(err => {
+                console.error('获取评分数量失败', err)
             })
     },
 
@@ -320,37 +330,51 @@ Page({
             .orderBy('timestamp', 'desc')
             .get()
             .then(res => {
-                const ratings = res.data
+                const allRatings = res.data;
 
                 // 如果没有评分，直接设置空数组
-                if (ratings.length === 0) {
+                if (allRatings.length === 0) {
                     this.setData({
                         ratings: [],
                         loading: false
-                    })
-                    return
+                    });
+                    return;
                 }
 
+                // 对评分进行处理，只保留每个商家的最新评分
+                const merchantMap = new Map(); // 用于存储每个商家的最新评分
+
+                allRatings.forEach(rating => {
+                    // 如果商家ID不在Map中，或者当前评分比Map中的更新，则更新Map
+                    if (!merchantMap.has(rating.merchantId) ||
+                        rating.timestamp > merchantMap.get(rating.merchantId).timestamp) {
+                        merchantMap.set(rating.merchantId, rating);
+                    }
+                });
+
+                // 将Map转换为数组
+                const latestRatings = Array.from(merchantMap.values());
+
                 // 获取所有商家ID
-                const merchantIds = ratings.map(item => item.merchantId)
+                const merchantIds = latestRatings.map(item => item.merchantId);
 
                 // 批量获取商家信息
                 const tasks = merchantIds.map(id => {
-                    return db.collection('merchants').doc(id).get()
-                })
+                    return db.collection('merchants').doc(id).get();
+                });
 
                 // 并行执行所有查询
                 Promise.all(tasks)
                     .then(results => {
                         // 将商家信息添加到评分数据中，并格式化时间和星星数组
-                        const ratingsWithMerchant = ratings.map((rating, index) => {
+                        const ratingsWithMerchant = latestRatings.map((rating, index) => {
                             // 生成星星数组，用于展示
-                            const starArray = []
+                            const starArray = [];
                             for (let i = 0; i < 5; i++) {
                                 if (i < rating.score) {
-                                    starArray.push('full')
+                                    starArray.push('full');
                                 } else {
-                                    starArray.push('empty')
+                                    starArray.push('empty');
                                 }
                             }
 
@@ -359,31 +383,31 @@ Page({
                                 merchant: results[index].data,
                                 formattedTime: this.formatTime(rating.timestamp),
                                 starArray: starArray
-                            }
-                        })
+                            };
+                        });
 
                         this.setData({
                             ratings: ratingsWithMerchant,
                             loading: false
-                        })
+                        });
                     })
                     .catch(err => {
-                        console.error('获取商家信息失败', err)
-                        this.setData({ loading: false })
+                        console.error('获取商家信息失败', err);
+                        this.setData({ loading: false });
                         wx.showToast({
                             title: '加载失败，请重试',
                             icon: 'none'
-                        })
-                    })
+                        });
+                    });
             })
             .catch(err => {
-                console.error('获取评分失败', err)
-                this.setData({ loading: false })
+                console.error('获取评分失败', err);
+                this.setData({ loading: false });
                 wx.showToast({
                     title: '加载失败，请重试',
                     icon: 'none'
-                })
-            })
+                });
+            });
     },
 
     // 格式化时间
