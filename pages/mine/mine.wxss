@@ -51,26 +51,29 @@
   width: 140rpx;
   height: 140rpx;
   margin-bottom: 20rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.user-avatar, .default-avatar {
+.avatar-wrapper {
   width: 130rpx;
   height: 130rpx;
   border-radius: 50%;
-  position: absolute;
-  top: 5rpx;
-  left: 5rpx;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(255,255,255,0.6));
+  box-shadow: 0 0 15rpx rgba(0, 0, 0, 0.1);
+  padding: 5rpx;
 }
 
-.avatar-border {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 140rpx;
-  height: 140rpx;
+.user-avatar, .default-avatar {
+  width: 120rpx;
+  height: 120rpx;
   border-radius: 50%;
-  border: 3rpx solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 0 10rpx rgba(0, 0, 0, 0.1);
+  object-fit: cover;
 }
 
 .user-name {

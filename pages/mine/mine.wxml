@@ -5,8 +5,9 @@
     <block wx:if="{{isLogin}}">
       <view class="user-info">
         <view class="avatar-container">
-          <image class="user-avatar" src="{{userInfo.avatarUrl}}"></image>
-          <view class="avatar-border"></view>
+          <view class="avatar-wrapper">
+            <image class="user-avatar" src="{{userInfo.avatarUrl}}"></image>
+          </view>
         </view>
         <text class="user-name">{{userInfo.nickname || '微信用户'}}</text>
         <view class="edit-profile" bindtap="goToEditProfile" hover-class="button-hover">
@@ -33,8 +34,9 @@
     </block>
     <view wx:else class="not-login">
       <view class="avatar-container">
-        <image class="default-avatar" src="/images/default-avatar.png"></image>
-        <view class="avatar-border"></view>
+        <view class="avatar-wrapper">
+          <image class="default-avatar" src="/images/default-avatar.png"></image>
+        </view>
       </view>
       <text class="login-tip">登录后可评论、收藏与评分</text>
       <button class="login-btn" bindtap="goToLogin" hover-class="button-hover">立即登录</button>
