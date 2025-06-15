@@ -5,6 +5,19 @@ cloud.init({
     env: cloud.DYNAMIC_CURRENT_ENV
 })
 
+// 自定义Promise.allSettled实现，兼容旧版本Node.js
+if (!Promise.allSettled) {
+    Promise.allSettled = function (promises) {
+        return Promise.all(
+            promises.map(p =>
+                Promise.resolve(p)
+                    .then(value => ({ status: 'fulfilled', value }))
+                    .catch(reason => ({ status: 'rejected', reason }))
+            )
+        );
+    };
+}
+
 const db = cloud.database()
 const _ = db.command
 const $ = db.command.aggregate
@@ -12,6 +25,14 @@ const $ = db.command.aggregate
 // 云函数入口函数
 exports.main = async (event, context) => {
     try {
+        // 初始化管理员权限
+        cloud.updateConfig({
+            env: cloud.DYNAMIC_CURRENT_ENV
+        })
+        const db = cloud.database({
+            env: cloud.DYNAMIC_CURRENT_ENV
+        })
+
         // 1. 获取所有收藏记录
         const favoritesResult = await db.collection('favorites').get()
         const favorites = favoritesResult.data
@@ -49,12 +70,34 @@ exports.main = async (event, context) => {
 
         // 3. 删除重复项
         let deletedCount = 0
-        for (const id of duplicates) {
+
+        // 使用云函数的管理员权限进行批量删除
+        if (duplicates.length > 0) {
             try {
-                await db.collection('favorites').doc(id).remove()
-                deletedCount++
+                // 批量删除，每次最多删除20条
+                const batchSize = 20;
+                for (let i = 0; i < duplicates.length; i += batchSize) {
+                    const batch = duplicates.slice(i, i + batchSize);
+                    const deletePromises = batch.map(id => {
+                        return db.collection('favorites').doc(id).remove()
+                            .then(() => true)
+                            .catch(err => {
+                                console.error(`删除收藏记录 ${id} 失败:`, err);
+                                return false;
+                            });
+                    });
+
+                    const results = await Promise.allSettled(deletePromises);
+
+                    // 统计成功删除的数量
+                    results.forEach(result => {
+                        if (result.status === 'fulfilled' && result.value === true) {
+                            deletedCount++;
+                        }
+                    });
+                }
             } catch (err) {
-                console.error(`删除收藏记录 ${id} 失败:`, err)
+                console.error('批量删除收藏记录失败:', err);
             }
         }
 
@@ -68,7 +111,7 @@ exports.main = async (event, context) => {
         console.error('清理重复收藏失败:', error)
         return {
             success: false,
-            error: error
+            error: error.message || error
         }
     }
 } 

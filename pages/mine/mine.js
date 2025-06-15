@@ -246,19 +246,16 @@ Page({
                 if (duplicates.length > 0) {
                     console.log(`发现 ${duplicates.length} 条重复收藏记录，正在清理...`)
 
-                    // 创建删除任务
-                    const deleteTasks = duplicates.map(id => {
-                        return db.collection('favorites').doc(id).remove()
+                    // 使用云函数清理重复收藏，而不是直接在客户端删除
+                    wx.cloud.callFunction({
+                        name: 'cleanAllDuplicates',
+                        success: res => {
+                            console.log('清理重复收藏成功:', res.result)
+                        },
+                        fail: err => {
+                            console.error('清理重复收藏失败:', err)
+                        }
                     })
-
-                    // 执行删除任务
-                    Promise.all(deleteTasks)
-                        .then(() => {
-                            console.log('成功清理重复收藏记录')
-                        })
-                        .catch(err => {
-                            console.error('清理重复收藏记录失败', err)
-                        })
                 }
 
                 // 获取所有商家ID（使用去重后的收藏记录）

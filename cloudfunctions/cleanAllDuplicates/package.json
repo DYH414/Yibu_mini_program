@@ -1,7 +1,7 @@
 {
     "name": "cleanAllDuplicates",
     "version": "1.0.0",
-    "description": "清理所有用户的重复收藏记录",
+    "description": "清理重复收藏记录的云函数",
     "main": "index.js",
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1"
