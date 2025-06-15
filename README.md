@@ -4,7 +4,7 @@
 
 ## 功能特点
 
-- 分类浏览：支持按全部、快餐、小吃、汉堡、奶茶、外卖平台、其他等分类查看
+- 分类浏览：支持按全部、正餐、小吃、汉堡、奶茶、外卖平台、其他等分类查看
 - 商家评分：用户可以为商家评星（1-5星），每用户仅能评分一次
 - 评论互动：支持用户评论和点赞评论，评论按点赞数排序
 - 收藏商家：收藏喜欢的商家，方便下次访问
@@ -25,7 +25,7 @@
 - name: 商家名称
 - logoUrl: 商家logo图片地址（云存储外链）
 - description: 商家描述
-- category: 分类（快餐、小吃、汉堡、奶茶等）
+- category: 分类（正餐、小吃、汉堡、奶茶等）
 - platforms: 平台信息数组 [ { name, appId, iconUrl } ]
 - createTime: 创建时间
 
@@ -76,7 +76,7 @@
 
 1. **分类图标**（放置在 images/categories/ 目录下）：
    - all.png - 全部分类图标
-   - fast-food.png - 快餐图标
+   - fast-food.png - 正餐图标
    - snack.png - 小吃图标
    - burger.png - 汉堡图标
    - milk-tea.png - 奶茶图标
@@ -115,6 +115,7 @@
 美团：cloud://cloudbase-0gdnnqax782f54fa.636c-cloudbase-0gdnnqax782f54fa-1363163853/images/meituan.png
 京东：	cloud://cloudbase-0gdnnqax782f54fa.636c-cloudbase-0gdnnqax782f54fa-1363163853/images/jingdong.png
 
+饿了么APPID:
 ## 页面功能说明
 
 ### 首页

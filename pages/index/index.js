@@ -7,7 +7,7 @@ Page({
     data: {
         categories: [
             { id: 'all', name: '全部', icon: '/images/categories/all.png' },
-            { id: 'fast-food', name: '快餐', icon: '/images/categories/fast-food.png' },
+            { id: 'fast-food', name: '正餐', icon: '/images/categories/fast-food.png' },
             { id: 'snack', name: '小吃', icon: '/images/categories/snack.png' },
             { id: 'burger', name: '汉堡', icon: '/images/categories/burger.png' },
             { id: 'milk-tea', name: '奶茶', icon: '/images/categories/milk-tea.png' },
