@@ -142,7 +142,15 @@ Page({
 
     // 获取各类数据的数量
     getDataCounts: function () {
-        const userOpenId = app.globalData.userInfo.openid
+        const userInfo = app.globalData.userInfo;
+        const userOpenId = userInfo._id || userInfo.openid;
+
+        if (!userOpenId) {
+            console.error('无法获取用户ID');
+            return;
+        }
+
+        console.log('获取数据计数，用户ID:', userOpenId);
 
         // 获取收藏数量 - 修改为只统计不同商家的收藏数量
         db.collection('favorites')
@@ -151,20 +159,21 @@ Page({
             })
             .get()
             .then(res => {
+                console.log('获取到收藏数据:', res.data.length, '条');
                 // 使用Set来存储已收藏的商家ID，自动去重
-                const merchantIds = new Set()
+                const merchantIds = new Set();
                 res.data.forEach(favorite => {
-                    merchantIds.add(favorite.merchantId)
-                })
+                    merchantIds.add(favorite.merchantId);
+                });
 
                 // Set的size属性即为不同商家的数量
                 this.setData({
                     favoriteCount: merchantIds.size
-                })
+                });
             })
             .catch(err => {
-                console.error('获取收藏数量失败', err)
-            })
+                console.error('获取收藏数量失败', err);
+            });
 
         // 获取评论数量
         db.collection('comments')
@@ -173,10 +182,11 @@ Page({
             })
             .count()
             .then(res => {
+                console.log('评论总数:', res.total);
                 this.setData({
                     commentCount: res.total
-                })
-            })
+                });
+            });
 
         // 获取评分数量 - 修改为只统计不同商家的评分数量
         db.collection('ratings')
@@ -185,25 +195,35 @@ Page({
             })
             .get()
             .then(res => {
+                console.log('获取到评分数据:', res.data.length, '条');
                 // 使用Set来存储已评分的商家ID，自动去重
-                const merchantIds = new Set()
+                const merchantIds = new Set();
                 res.data.forEach(rating => {
-                    merchantIds.add(rating.merchantId)
-                })
+                    merchantIds.add(rating.merchantId);
+                });
 
                 // Set的size属性即为不同商家的数量
                 this.setData({
                     ratingCount: merchantIds.size
-                })
+                });
             })
             .catch(err => {
-                console.error('获取评分数量失败', err)
-            })
+                console.error('获取评分数量失败', err);
+            });
     },
 
     // 加载收藏数据
     loadFavorites: function () {
-        const userOpenId = app.globalData.userInfo.openid
+        const userInfo = app.globalData.userInfo;
+        const userOpenId = userInfo._id || userInfo.openid;
+
+        if (!userOpenId) {
+            console.error('无法获取用户ID');
+            this.setData({ loading: false });
+            return;
+        }
+
+        console.log('加载收藏数据，用户ID:', userOpenId);
 
         db.collection('favorites')
             .where({
@@ -212,35 +232,36 @@ Page({
             .orderBy('timestamp', 'desc')
             .get()
             .then(res => {
-                const favorites = res.data
+                console.log('获取到收藏数据:', res.data.length, '条');
+                const favorites = res.data;
 
                 // 如果没有收藏，直接设置空数组
                 if (favorites.length === 0) {
                     this.setData({
                         favorites: [],
                         loading: false
-                    })
-                    return
+                    });
+                    return;
                 }
 
                 // 检查是否有重复收藏记录，并进行处理
-                const merchantIdMap = new Map() // 用于存储商家ID到收藏记录的映射
-                const uniqueFavorites = [] // 存储去重后的收藏记录
-                const duplicates = [] // 存储需要删除的重复记录ID
+                const merchantIdMap = new Map(); // 用于存储商家ID到收藏记录的映射
+                const uniqueFavorites = []; // 存储去重后的收藏记录
+                const duplicates = []; // 存储需要删除的重复记录ID
 
                 // 遍历所有收藏记录，保留每个商家最新的收藏记录
                 favorites.forEach(favorite => {
-                    const merchantId = favorite.merchantId
+                    const merchantId = favorite.merchantId;
 
                     if (!merchantIdMap.has(merchantId)) {
                         // 第一次出现的商家，添加到唯一收藏列表
-                        merchantIdMap.set(merchantId, favorite)
-                        uniqueFavorites.push(favorite)
+                        merchantIdMap.set(merchantId, favorite);
+                        uniqueFavorites.push(favorite);
                     } else {
                         // 重复出现的商家，记录为重复项
-                        duplicates.push(favorite._id)
+                        duplicates.push(favorite._id);
                     }
-                })
+                });
 
                 // 如果有重复收藏，自动清理
                 if (duplicates.length > 0) {
@@ -303,7 +324,16 @@ Page({
 
     // 加载评论数据
     loadComments: function () {
-        const userOpenId = app.globalData.userInfo.openid
+        const userInfo = app.globalData.userInfo;
+        const userOpenId = userInfo._id || userInfo.openid;
+
+        if (!userOpenId) {
+            console.error('无法获取用户ID');
+            this.setData({ loading: false });
+            return;
+        }
+
+        console.log('加载评论数据，用户ID:', userOpenId);
 
         db.collection('comments')
             .where({
@@ -312,24 +342,25 @@ Page({
             .orderBy('timestamp', 'desc')
             .get()
             .then(res => {
-                const comments = res.data
+                console.log('获取到评论数据:', res.data.length, '条');
+                const comments = res.data;
 
                 // 如果没有评论，直接设置空数组
                 if (comments.length === 0) {
                     this.setData({
                         comments: [],
                         loading: false
-                    })
-                    return
+                    });
+                    return;
                 }
 
                 // 获取所有商家ID
-                const merchantIds = comments.map(item => item.merchantId)
+                const merchantIds = comments.map(item => item.merchantId);
 
                 // 批量获取商家信息
                 const tasks = merchantIds.map(id => {
-                    return db.collection('merchants').doc(id).get()
-                })
+                    return db.collection('merchants').doc(id).get();
+                });
 
                 // 并行执行所有查询
                 Promise.all(tasks)
@@ -340,36 +371,45 @@ Page({
                                 ...comment,
                                 merchant: results[index].data,
                                 formattedTime: this.formatTime(comment.timestamp)
-                            }
-                        })
+                            };
+                        });
 
                         this.setData({
                             comments: commentsWithMerchant,
                             loading: false
-                        })
+                        });
                     })
                     .catch(err => {
-                        console.error('获取商家信息失败', err)
-                        this.setData({ loading: false })
+                        console.error('获取商家信息失败', err);
+                        this.setData({ loading: false });
                         wx.showToast({
                             title: '加载失败，请重试',
                             icon: 'none'
-                        })
-                    })
+                        });
+                    });
             })
             .catch(err => {
-                console.error('获取评论失败', err)
-                this.setData({ loading: false })
+                console.error('获取评论失败', err);
+                this.setData({ loading: false });
                 wx.showToast({
                     title: '加载失败，请重试',
                     icon: 'none'
-                })
-            })
+                });
+            });
     },
 
     // 加载评分数据
     loadRatings: function () {
-        const userOpenId = app.globalData.userInfo.openid
+        const userInfo = app.globalData.userInfo;
+        const userOpenId = userInfo._id || userInfo.openid;
+
+        if (!userOpenId) {
+            console.error('无法获取用户ID');
+            this.setData({ loading: false });
+            return;
+        }
+
+        console.log('加载评分数据，用户ID:', userOpenId);
 
         db.collection('ratings')
             .where({
@@ -378,6 +418,7 @@ Page({
             .orderBy('timestamp', 'desc')
             .get()
             .then(res => {
+                console.log('获取到评分数据:', res.data.length, '条');
                 const allRatings = res.data;
 
                 // 如果没有评分，直接设置空数组
