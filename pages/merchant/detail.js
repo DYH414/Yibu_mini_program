@@ -67,6 +67,9 @@ Page({
     onShow: function () {
         // 每次页面显示时重新检查登录状态
         this.checkLoginStatus()
+
+        // 每次页面显示时重新加载评论数据
+        this.loadComments()
     },
 
     onPullDownRefresh: function () {
@@ -103,16 +106,19 @@ Page({
         const cachedData = app.cache.get(cacheKey);
         if (cachedData) {
             console.log('使用缓存的商家详情数据(云函数)');
+
+            // 使用缓存的商家信息和评分，但重新加载评论
             this.setData({
                 merchant: cachedData.merchant,
                 platforms: cachedData.merchant.platforms || [],
                 ratingStars: this.generateRatingStars(cachedData.merchant.avgRating),
-                comments: cachedData.comments,
                 userRating: cachedData.userRating,
                 isFavorite: cachedData.isFavorite,
-                loading: false,
-                commentLoading: false
+                loading: false
             });
+
+            // 单独加载最新评论数据
+            this.loadComments();
 
             wx.stopPullDownRefresh();
             return;
@@ -148,10 +154,9 @@ Page({
                     commentLoading: false
                 });
 
-                // 缓存数据
+                // 缓存商家基本数据，但不缓存评论
                 app.cache.set(cacheKey, {
                     merchant: data.merchant,
-                    comments: processedComments,
                     userRating: data.userRating,
                     isFavorite: data.isFavorite
                 }, 5 * 60 * 1000); // 5分钟缓存
@@ -347,21 +352,7 @@ Page({
         // 构建缓存键
         const cacheKey = `merchant_comments_${this.data.merchantId}`;
 
-        // 尝试从缓存获取数据
-        const cachedComments = app.cache.get(cacheKey);
-        if (cachedComments) {
-            console.log('使用缓存的评论数据');
-
-            // 处理评论的点赞状态
-            const processedComments = this.processComments(cachedComments);
-
-            this.setData({
-                comments: processedComments,
-                commentLoading: false
-            });
-            return;
-        }
-
+        // 不使用缓存，确保每次都获取最新的评论数据
         db.collection('comments')
             .where({
                 merchantId: this.data.merchantId
@@ -371,8 +362,8 @@ Page({
             .then(res => {
                 const comments = res.data;
 
-                // 缓存评论数据
-                app.cache.set(cacheKey, comments, 3 * 60 * 1000); // 3分钟缓存
+                // 不再缓存评论数据
+                // app.cache.set(cacheKey, comments, 3 * 60 * 1000); // 3分钟缓存
 
                 if (comments.length === 0) {
                     this.setData({
@@ -544,28 +535,57 @@ Page({
         const userInfo = app.globalData.userInfo || {}
         const userOpenId = this.data.userOpenid
 
+        // 准备评论数据
+        const commentData = {
+            merchantId: this.data.merchantId,
+            userOpenId: userOpenId,
+            // 为了兼容性，仍然保存当前的用户昵称和头像
+            userNickname: userInfo.nickname || '微信用户',
+            userAvatarUrl: userInfo.avatarUrl || '/images/default-avatar.png',
+            content: content,
+            likes: 0,
+            likedBy: [],
+            timestamp: db.serverDate()
+        }
+
         db.collection('comments').add({
-            data: {
-                merchantId: this.data.merchantId,
-                userOpenId: userOpenId,
-                // 为了兼容性，仍然保存当前的用户昵称和头像
-                userNickname: userInfo.nickname || '微信用户',
-                userAvatarUrl: userInfo.avatarUrl || '/images/default-avatar.png',
-                content: content,
-                likes: 0,
-                likedBy: [],
-                timestamp: db.serverDate()
-            }
-        }).then(() => {
+            data: commentData
+        }).then(res => {
             wx.hideLoading()
             wx.showToast({
                 title: '评论成功',
                 icon: 'success'
             })
+
+            // 清空评论输入框
             this.setData({
                 commentContent: ''
             })
-            this.loadComments()
+
+            // 获取新评论的ID
+            const newCommentId = res._id
+
+            // 处理新评论数据，添加到当前评论列表顶部
+            const newComment = {
+                ...commentData,
+                _id: newCommentId,
+                user: {
+                    nickname: userInfo.nickname || '微信用户',
+                    avatarUrl: userInfo.avatarUrl || '/images/default-avatar.png'
+                },
+                isLiked: false,
+                animating: false
+            }
+
+            // 更新评论列表
+            const updatedComments = [newComment, ...this.data.comments]
+
+            // 重新按点赞数排序
+            updatedComments.sort((a, b) => b.likes - a.likes)
+
+            this.setData({
+                comments: updatedComments
+            })
         }).catch(err => {
             console.error('提交评论失败', err)
             wx.hideLoading()
