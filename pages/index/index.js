@@ -46,7 +46,8 @@ Page({
             isRefreshing: true,
             loading: true,
             page: 1,
-            hasMore: true
+            hasMore: true,
+            isLoadingMore: false
         })
 
         // 重新加载商家数据
@@ -113,7 +114,8 @@ Page({
             page: 1,
             hasMore: true,
             showSearchHistory: false, // 隐藏搜索历史
-            scrollPosition: 0 // 重置滚动位置
+            scrollPosition: 0, // 重置滚动位置
+            isLoadingMore: false // 重置加载更多状态
         })
         this.loadMerchants()
     },
@@ -127,7 +129,8 @@ Page({
             page: 1,
             hasMore: true,
             showSearchHistory: false, // 隐藏搜索历史
-            scrollPosition: 0 // 重置滚动位置
+            scrollPosition: 0, // 重置滚动位置
+            isLoadingMore: false // 重置加载更多状态
         })
 
         if (this.data.isSearching && this.data.searchKeyword) {
@@ -200,6 +203,7 @@ Page({
                     originalMerchants: cachedData,
                     loading: false,
                     isRefreshing: false,
+                    isLoadingMore: false,
                     hasMore: cachedData.length === this.data.pageSize
                 });
                 return;
@@ -519,13 +523,12 @@ Page({
 
     // 加载更多商家数据
     loadMoreMerchants: function () {
-        if (!this.data.hasMore || this.data.loading || this.data.isLoadingMore) {
+        if (!this.data.hasMore || this.data.isLoadingMore) {
             return
         }
 
         this.setData({
             page: this.data.page + 1,
-            loading: true,
             isLoadingMore: true
         })
 
@@ -720,13 +723,12 @@ Page({
 
     // 加载更多搜索结果
     loadMoreSearchResults: function () {
-        if (!this.data.hasMore || this.data.loading || !this.data.searchKeyword || this.data.isLoadingMore) {
+        if (!this.data.hasMore || !this.data.searchKeyword || this.data.isLoadingMore) {
             return
         }
 
         this.setData({
             page: this.data.page + 1,
-            loading: true,
             isLoadingMore: true
         })
 
@@ -755,7 +757,6 @@ Page({
 
                 this.setData({
                     merchants: newMerchants,
-                    loading: false,
                     isLoadingMore: false,
                     hasMore: moreMerchants.length === this.data.pageSize &&
                         (this.data.page * this.data.pageSize) < total
@@ -767,7 +768,6 @@ Page({
                 // 加载更多时，如果云函数返回非成功，一般意味着没有更多数据
                 console.warn('加载更多搜索结果未成功:', res.result);
                 this.setData({
-                    loading: false,
                     isLoadingMore: false,
                     hasMore: false
                 });
@@ -775,7 +775,6 @@ Page({
         }).catch(err => {
             console.error('加载更多搜索结果失败', err)
             this.setData({
-                loading: false,
                 isLoadingMore: false
             })
             this.handleSearchError() // 只有在真实网络错误时才提示

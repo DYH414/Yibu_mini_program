@@ -97,12 +97,18 @@
       <text>暂无相关商家</text>
     </view>
 
-    <!-- 加载状态 -->
-    <view wx:if="{{loading && !isRefreshing}}" class="loading-state">
+    <!-- 首次加载状态 -->
+    <view wx:if="{{loading && !isRefreshing && !isLoadingMore}}" class="loading-state">
       <text>加载中...</text>
     </view>
     
-    <!-- 加载更多提示 -->
+    <!-- 底部加载更多指示器 -->
+    <view wx:if="{{isLoadingMore}}" class="loading-more">
+      <view class="loading-more-spinner"></view>
+      <text>加载更多...</text>
+    </view>
+    
+    <!-- 加载完毕提示 -->
     <view wx:if="{{!loading && merchants.length > 0 && !hasMore}}" class="load-more-tip">
       <text>没有更多了</text>
     </view>
