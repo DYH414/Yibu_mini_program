@@ -26,7 +26,9 @@ Page({
         page: 1,
         pageSize: 10,
         hasMore: true,
-        showSearchHistory: false // 是否显示搜索历史
+        showSearchHistory: false, // 是否显示搜索历史
+        scrollPosition: 0, // 保存滚动位置
+        isLoadingMore: false // 是否正在加载更多数据
     },
 
     onLoad: function (options) {
@@ -60,14 +62,43 @@ Page({
      * 用于加载更多数据
      */
     onReachBottom: function () {
-        if (!this.data.hasMore || this.data.loading) {
+        if (!this.data.hasMore || this.data.loading || this.data.isLoadingMore) {
             return
         }
+
+        // 保存当前滚动位置
+        this.saveScrollPosition()
 
         if (this.data.isSearching && this.data.searchKeyword) {
             this.loadMoreSearchResults()
         } else {
             this.loadMoreMerchants()
+        }
+    },
+
+    // 保存页面滚动位置
+    saveScrollPosition: function () {
+        wx.createSelectorQuery()
+            .selectViewport()
+            .scrollOffset(res => {
+                this.setData({
+                    scrollPosition: res.scrollTop
+                })
+                console.log('保存滚动位置:', res.scrollTop)
+            })
+            .exec()
+    },
+
+    // 恢复页面滚动位置
+    restoreScrollPosition: function () {
+        if (this.data.scrollPosition > 0 && this.data.page > 1) {
+            setTimeout(() => {
+                wx.pageScrollTo({
+                    scrollTop: this.data.scrollPosition,
+                    duration: 0
+                })
+                console.log('恢复滚动位置:', this.data.scrollPosition)
+            }, 100)
         }
     },
 
@@ -81,7 +112,8 @@ Page({
             isSearching: false,  // 退出搜索状态
             page: 1,
             hasMore: true,
-            showSearchHistory: false // 隐藏搜索历史
+            showSearchHistory: false, // 隐藏搜索历史
+            scrollPosition: 0 // 重置滚动位置
         })
         this.loadMerchants()
     },
@@ -94,7 +126,8 @@ Page({
             loading: true,
             page: 1,
             hasMore: true,
-            showSearchHistory: false // 隐藏搜索历史
+            showSearchHistory: false, // 隐藏搜索历史
+            scrollPosition: 0 // 重置滚动位置
         })
 
         if (this.data.isSearching && this.data.searchKeyword) {
@@ -187,8 +220,7 @@ Page({
         if (this.data.sortBy === 'rating') {
             orderField = 'avgRating'
         }
-        // 默认排序时，优先按照isFeatured排序，然后按照createTime排序
-        // 注意：微信小程序云数据库不支持多字段排序，我们需要在获取数据后手动排序
+        // 默认排序时使用综合排序，但由于云数据库不支持复杂排序，我们先获取数据后再排序
 
         // 分页查询
         query = query.orderBy(orderField, 'desc')
@@ -205,6 +237,7 @@ Page({
                     this.setData({
                         loading: false,
                         isRefreshing: false,
+                        isLoadingMore: false,
                         hasMore: false
                     })
 
@@ -218,18 +251,25 @@ Page({
 
                 // 批量获取评分数据
                 this.batchGetRatings(merchantIds, merchants).then(updatedMerchants => {
+                    // 批量获取评论数据
+                    return this.batchGetComments(merchantIds, updatedMerchants);
+                }).then(updatedMerchants => {
+                    // 批量获取收藏数据
+                    return this.batchGetFavorites(merchantIds, updatedMerchants);
+                }).then(updatedMerchants => {
                     // 如果是按评分排序，再次排序
                     if (this.data.sortBy === 'rating') {
                         updatedMerchants.sort((a, b) => b.avgRating - a.avgRating)
                     }
-                    // 如果是默认排序，先按isFeatured排序，再按createTime排序
+                    // 如果是默认排序，使用综合排序算法
                     else if (this.data.sortBy === 'default') {
                         updatedMerchants.sort((a, b) => {
-                            // 首先按照是否推荐排序（推荐的排在前面）
-                            if (a.isFeatured && !b.isFeatured) return -1;
-                            if (!a.isFeatured && b.isFeatured) return 1;
-                            // 如果推荐状态相同，则按创建时间排序（新的排在前面）
-                            return b.createTime - a.createTime;
+                            // 计算综合分数
+                            const scoreA = this.calculateCompositeScore(a);
+                            const scoreB = this.calculateCompositeScore(b);
+
+                            // 按综合分数降序排序
+                            return scoreB - scoreA;
                         });
                     }
 
@@ -243,6 +283,7 @@ Page({
                         originalMerchants: newMerchants, // 保存原始数据用于搜索
                         loading: false,
                         isRefreshing: false,
+                        isLoadingMore: false,
                         hasMore: updatedMerchants.length === this.data.pageSize
                     })
 
@@ -251,41 +292,62 @@ Page({
                         app.cache.set(cacheKey, newMerchants);
                     }
 
+                    // 如果是加载更多，恢复滚动位置
+                    if (this.data.page > 1) {
+                        this.restoreScrollPosition();
+                    }
+
                     console.log('数据加载完成，停止下拉刷新')
                     // 停止下拉刷新动画
                     wx.stopPullDownRefresh()
                 }).catch(err => {
-                    console.error('处理评分数据失败', err)
+                    console.error('处理商家数据失败', err)
                     this.setData({
                         loading: false,
-                        isRefreshing: false
+                        isRefreshing: false,
+                        isLoadingMore: false
                     })
+                    // 停止下拉刷新动画
                     wx.stopPullDownRefresh()
-                });
+                })
             })
             .catch(err => {
-                console.error('加载商家数据失败', err)
+                console.error('获取商家列表失败', err)
                 this.setData({
                     loading: false,
-                    isRefreshing: false
+                    isRefreshing: false,
+                    isLoadingMore: false
                 })
-
-                // 显示错误提示
-                wx.showToast({
-                    title: '刷新失败',
-                    icon: 'none'
-                })
-
                 // 停止下拉刷新动画
                 wx.stopPullDownRefresh()
             })
     },
 
     /**
-     * 批量获取评分数据
-     * @param {Array} merchantIds - 商家ID列表
-     * @param {Array} merchants - 商家数据列表
-     * @return {Promise} 更新后的商家数据
+     * 计算商家的综合分数
+     * 综合评分、评论数和收藏数
+     */
+    calculateCompositeScore: function (merchant) {
+        // 获取评分、评论数和收藏数
+        const avgRating = parseFloat(merchant.avgRating || 0);
+        const commentsCount = merchant.commentsCount || 0;
+        const favoritesCount = merchant.favoritesCount || 0;
+
+        // 计算综合分数: 评分占50%，评论数占30%，收藏数占20%
+        const score = avgRating * 0.5 +
+            (Math.log(commentsCount + 1) * 0.3) +
+            (Math.log(favoritesCount + 1) * 0.2);
+
+        // 如果是推荐商家，增加权重
+        if (merchant.isFeatured) {
+            return score * 1.2;
+        }
+
+        return score;
+    },
+
+    /**
+     * 批量获取商家评分数据
      */
     batchGetRatings: function (merchantIds, merchants) {
         // 获取app实例
@@ -357,15 +419,114 @@ Page({
             });
     },
 
+    /**
+     * 批量获取商家评论数据
+     */
+    batchGetComments: function (merchantIds, merchants) {
+        // 获取app实例
+        const app = getApp();
+
+        // 尝试从缓存获取评论数据
+        const cacheKey = `comments_count_${merchantIds.join('_')}`;
+        const cachedCommentsCount = app.cache.get(cacheKey);
+
+        if (cachedCommentsCount) {
+            console.log('使用缓存的评论数量数据');
+            // 使用缓存的评论数量更新商家信息
+            return Promise.resolve(merchants.map(merchant => {
+                merchant.commentsCount = cachedCommentsCount[merchant._id] || 0;
+                return merchant;
+            }));
+        }
+
+        // 缓存不存在，从数据库获取评论数据
+        return db.collection('comments')
+            .where({
+                merchantId: db.command.in(merchantIds)
+            })
+            .get()
+            .then(res => {
+                const comments = res.data;
+
+                // 按商家ID分组评论数据
+                const commentsByMerchant = {};
+                comments.forEach(comment => {
+                    if (!commentsByMerchant[comment.merchantId]) {
+                        commentsByMerchant[comment.merchantId] = 0;
+                    }
+                    commentsByMerchant[comment.merchantId]++;
+                });
+
+                // 缓存评论数量数据
+                app.cache.set(cacheKey, commentsByMerchant, 10 * 60 * 1000); // 10分钟缓存
+
+                // 更新商家信息
+                return merchants.map(merchant => {
+                    merchant.commentsCount = commentsByMerchant[merchant._id] || 0;
+                    return merchant;
+                });
+            });
+    },
+
+    /**
+     * 批量获取商家收藏数据
+     */
+    batchGetFavorites: function (merchantIds, merchants) {
+        // 获取app实例
+        const app = getApp();
+
+        // 尝试从缓存获取收藏数据
+        const cacheKey = `favorites_count_${merchantIds.join('_')}`;
+        const cachedFavoritesCount = app.cache.get(cacheKey);
+
+        if (cachedFavoritesCount) {
+            console.log('使用缓存的收藏数量数据');
+            // 使用缓存的收藏数量更新商家信息
+            return Promise.resolve(merchants.map(merchant => {
+                merchant.favoritesCount = cachedFavoritesCount[merchant._id] || 0;
+                return merchant;
+            }));
+        }
+
+        // 缓存不存在，从数据库获取收藏数据
+        return db.collection('favorites')
+            .where({
+                merchantId: db.command.in(merchantIds)
+            })
+            .get()
+            .then(res => {
+                const favorites = res.data;
+
+                // 按商家ID分组收藏数据
+                const favoritesByMerchant = {};
+                favorites.forEach(favorite => {
+                    if (!favoritesByMerchant[favorite.merchantId]) {
+                        favoritesByMerchant[favorite.merchantId] = 0;
+                    }
+                    favoritesByMerchant[favorite.merchantId]++;
+                });
+
+                // 缓存收藏数量数据
+                app.cache.set(cacheKey, favoritesByMerchant, 10 * 60 * 1000); // 10分钟缓存
+
+                // 更新商家信息
+                return merchants.map(merchant => {
+                    merchant.favoritesCount = favoritesByMerchant[merchant._id] || 0;
+                    return merchant;
+                });
+            });
+    },
+
     // 加载更多商家数据
     loadMoreMerchants: function () {
-        if (!this.data.hasMore || this.data.loading) {
+        if (!this.data.hasMore || this.data.loading || this.data.isLoadingMore) {
             return
         }
 
         this.setData({
             page: this.data.page + 1,
-            loading: true
+            loading: true,
+            isLoadingMore: true
         })
 
         this.loadMerchants()
@@ -559,13 +720,14 @@ Page({
 
     // 加载更多搜索结果
     loadMoreSearchResults: function () {
-        if (!this.data.hasMore || this.data.loading || !this.data.searchKeyword) {
+        if (!this.data.hasMore || this.data.loading || !this.data.searchKeyword || this.data.isLoadingMore) {
             return
         }
 
         this.setData({
             page: this.data.page + 1,
-            loading: true
+            loading: true,
+            isLoadingMore: true
         })
 
         // 调用云函数加载更多搜索结果
@@ -594,19 +756,28 @@ Page({
                 this.setData({
                     merchants: newMerchants,
                     loading: false,
+                    isLoadingMore: false,
                     hasMore: moreMerchants.length === this.data.pageSize &&
                         (this.data.page * this.data.pageSize) < total
                 })
+
+                // 恢复滚动位置
+                this.restoreScrollPosition();
             } else {
                 // 加载更多时，如果云函数返回非成功，一般意味着没有更多数据
                 console.warn('加载更多搜索结果未成功:', res.result);
                 this.setData({
                     loading: false,
+                    isLoadingMore: false,
                     hasMore: false
                 });
             }
         }).catch(err => {
             console.error('加载更多搜索结果失败', err)
+            this.setData({
+                loading: false,
+                isLoadingMore: false
+            })
             this.handleSearchError() // 只有在真实网络错误时才提示
         })
     },

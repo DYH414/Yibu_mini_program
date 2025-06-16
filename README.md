@@ -112,9 +112,11 @@
 - **商家logo**：每个商家的logo图片，上传后获取cloudID或fileID
 - **平台图标**：各外卖平台（如美团、饿了么等）的图标，上传后获取cloudID或fileID
 饿了么：cloud://cloudbase-0gdnnqax782f54fa.636c-cloudbase-0gdnnqax782f54fa-1363163853/images/eleme.png
+饿了么appid：wxece3a9a4c82f58c9
 美团：cloud://cloudbase-0gdnnqax782f54fa.636c-cloudbase-0gdnnqax782f54fa-1363163853/images/meituan.png
+美团appid：wxde8ac0a21135c07d
 京东：	cloud://cloudbase-0gdnnqax782f54fa.636c-cloudbase-0gdnnqax782f54fa-1363163853/images/jingdong.png
-
+京东appid：wx91d27dbf599dff74
 ## 页面功能说明
 
 ### 首页

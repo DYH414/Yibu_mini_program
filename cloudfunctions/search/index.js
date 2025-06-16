@@ -1,103 +1,153 @@
 // 云函数入口文件
 const cloud = require('wx-server-sdk')
 
-cloud.init({
-    env: 'cloudbase-0gdnnqax782f54fa' // 您的云环境ID
-})
-
+cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
+const _ = db.command
 const $ = db.command.aggregate
 
 // 云函数入口函数
 exports.main = async (event, context) => {
-    const { keyword, category, sortBy, page = 1, pageSize = 10 } = event
-
     try {
-        if (!keyword) {
+        const { keyword, category, sortBy = 'default', page = 1, pageSize = 10 } = event
+        console.log('搜索参数:', { keyword, category, sortBy, page, pageSize })
+
+        // 参数验证
+        if (!keyword && !category) {
             return {
                 success: false,
-                message: '搜索关键词不能为空',
-                data: { merchants: [], total: 0 }
+                message: '搜索关键词和分类不能同时为空'
             }
         }
 
-        // 1. 构建匹配条件
-        const matchStage = {}
-        // 关键词模糊查询 (不区分大小写)
+        // 构建查询条件
+        const aggregate = db.collection('merchants').aggregate()
+
+        // 1. 关键词搜索
         if (keyword) {
-            matchStage.$or = [
-                { name: db.RegExp({ regexp: keyword, options: 'i' }) },
-                { description: db.RegExp({ regexp: keyword, options: 'i' }) }
-            ]
+            // 关键词搜索 - 匹配商家名称或描述
+            aggregate.match(_.or([
+                {
+                    name: db.RegExp({
+                        regexp: keyword,
+                        options: 'i', // 不区分大小写
+                    })
+                },
+                {
+                    description: db.RegExp({
+                        regexp: keyword,
+                        options: 'i', // 不区分大小写
+                    })
+                }
+            ]))
         }
-        // 分类匹配
+
+        // 2. 分类筛选
         if (category && category !== 'all') {
-            matchStage.category = category
+            aggregate.match({
+                category: category
+            })
         }
 
-        // 2. 聚合操作
-        const aggregate = db.collection('merchants').aggregate().match(matchStage)
+        // 3. 获取商家ID列表，用于后续关联查询
+        const merchantsResult = await aggregate.end()
+        const merchants = merchantsResult.list
 
-        // 3. 关联 ratings 集合
-        aggregate.lookup({
-            from: 'ratings',
-            localField: '_id',
-            foreignField: 'merchantId',
-            as: 'ratingsData',
+        if (merchants.length === 0) {
+            return {
+                success: true,
+                data: {
+                    merchants: [],
+                    total: 0
+                }
+            }
+        }
+
+        const merchantIds = merchants.map(m => m._id)
+
+        // 4. 获取评分数据
+        const ratingsResult = await db.collection('ratings')
+            .where({
+                merchantId: _.in(merchantIds)
+            })
+            .get()
+
+        const ratings = ratingsResult.data
+
+        // 5. 获取评论数据
+        const commentsResult = await db.collection('comments')
+            .where({
+                merchantId: _.in(merchantIds)
+            })
+            .get()
+
+        const comments = commentsResult.data
+
+        // 6. 获取收藏数据
+        const favoritesResult = await db.collection('favorites')
+            .where({
+                merchantId: _.in(merchantIds)
+            })
+            .get()
+
+        const favorites = favoritesResult.data
+
+        // 7. 处理数据，计算评分、评论数和收藏数
+        const merchantsWithData = merchants.map(merchant => {
+            // 处理评分
+            const merchantRatings = ratings.filter(r => r.merchantId === merchant._id)
+            const ratingCount = merchantRatings.length
+            let avgRating = 0
+
+            if (ratingCount > 0) {
+                const totalScore = merchantRatings.reduce((sum, rating) => sum + rating.score, 0)
+                avgRating = parseFloat((totalScore / ratingCount).toFixed(1))
+            }
+
+            // 处理评论数
+            const merchantComments = comments.filter(c => c.merchantId === merchant._id)
+            const commentsCount = merchantComments.length
+
+            // 处理收藏数
+            const merchantFavorites = favorites.filter(f => f.merchantId === merchant._id)
+            const favoritesCount = merchantFavorites.length
+
+            return {
+                ...merchant,
+                avgRating,
+                ratingCount,
+                commentsCount,
+                favoritesCount
+            }
         })
 
-        // 4. 计算平均分和评分数
-        aggregate.addFields({
-            ratingCount: $.size('$ratingsData'),
-            avgRating: $.ifNull([$.avg('$ratingsData.score'), 0]), // 无评分时默认为0
-        })
+        // 8. 排序
+        let sortedMerchants = merchantsWithData
 
-        // 5. 处理排序
-        const sortStage = {}
         if (sortBy === 'rating') {
-            sortStage.avgRating = -1
-        }
-        // 默认排序时，优先考虑isFeatured字段
-        else if (sortBy === 'default') {
-            // 注意：云数据库聚合不支持多字段排序，我们在后面手动处理
-            sortStage.createTime = -1
-        }
-        // 默认按相关性(数据库默认)或创建时间排序
-        else {
-            sortStage.createTime = -1
-        }
-        aggregate.sort(sortStage)
+            // 按评分排序
+            sortedMerchants.sort((a, b) => b.avgRating - a.avgRating)
+        } else if (sortBy === 'default') {
+            // 默认排序 - 使用综合排序算法
+            sortedMerchants.sort((a, b) => {
+                // 计算综合分数
+                const scoreA = calculateCompositeScore(a)
+                const scoreB = calculateCompositeScore(b)
 
-        // 6. 分页查询，并获取总数
-        const facetRes = await aggregate.facet({
-            paginatedResults: [
-                { $skip: (page - 1) * pageSize },
-                { $limit: pageSize }
-            ],
-            totalCount: [
-                { $count: 'count' }
-            ]
-        }).end()
-
-        let merchants = facetRes.list[0].paginatedResults
-        const totalCount = facetRes.list[0].totalCount.length > 0 ? facetRes.list[0].totalCount[0].count : 0
-
-        // 如果是默认排序，手动处理isFeatured排序
-        if (sortBy === 'default' && merchants.length > 0) {
-            merchants.sort((a, b) => {
-                // 首先按照是否推荐排序（推荐的排在前面）
-                if (a.isFeatured && !b.isFeatured) return -1;
-                if (!a.isFeatured && b.isFeatured) return 1;
-                // 如果推荐状态相同，则按创建时间排序（新的排在前面）
-                return b.createTime - a.createTime;
-            });
+                // 按综合分数降序排序
+                return scoreB - scoreA
+            })
         }
+
+        // 9. 分页
+        const total = sortedMerchants.length
+        const paginatedMerchants = sortedMerchants.slice((page - 1) * pageSize, page * pageSize)
 
         return {
             success: true,
             data: {
-                merchants: merchants,
-                total: totalCount,
+                merchants: paginatedMerchants,
+                total: total
             }
         }
     } catch (error) {
@@ -108,4 +158,27 @@ exports.main = async (event, context) => {
             error: error
         }
     }
+}
+
+/**
+ * 计算商家的综合分数
+ * 综合评分、评论数和收藏数
+ */
+function calculateCompositeScore(merchant) {
+    // 获取评分、评论数和收藏数
+    const avgRating = parseFloat(merchant.avgRating || 0)
+    const commentsCount = merchant.commentsCount || 0
+    const favoritesCount = merchant.favoritesCount || 0
+
+    // 计算综合分数: 评分占50%，评论数占30%，收藏数占20%
+    const score = avgRating * 0.5 +
+        (Math.log(commentsCount + 1) * 0.3) +
+        (Math.log(favoritesCount + 1) * 0.2)
+
+    // 如果是推荐商家，增加权重
+    if (merchant.isFeatured) {
+        return score * 1.2
+    }
+
+    return score
 } 
