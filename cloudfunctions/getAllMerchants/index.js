@@ -5,55 +5,27 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
 const db = cloud.database()
 const _ = db.command
 const $ = db.command.aggregate
+const MAX_LIMIT = 100 // 云函数单次查询最大条数
 
 // 云函数入口函数
 exports.main = async (event, context) => {
+    const { category, sortBy = 'default' } = event
+    console.log('获取所有商家参数:', { category, sortBy })
+
     try {
-        const { keyword, category, sortBy = 'default', page = 1, pageSize = 10 } = event
-        console.log('搜索参数:', { keyword, category, sortBy, page, pageSize })
-
-        // 参数验证
-        if (!keyword && !category) {
-            return {
-                success: false,
-                message: '搜索关键词和分类不能同时为空'
-            }
-        }
-
-        // 构建查询条件
-        const aggregate = db.collection('merchants').aggregate()
-
-        // 1. 关键词搜索
-        if (keyword) {
-            // 关键词搜索 - 匹配商家名称或描述
-            aggregate.match(_.or([
-                {
-                    name: db.RegExp({
-                        regexp: keyword,
-                        options: 'i', // 不区分大小写
-                    })
-                },
-                {
-                    description: db.RegExp({
-                        regexp: keyword,
-                        options: 'i', // 不区分大小写
-                    })
-                }
-            ]))
-        }
-
-        // 2. 分类筛选
+        // 1. 构建查询条件
+        let query = {}
         if (category && category !== 'all') {
-            aggregate.match({
-                category: category
-            })
+            query.category = category
         }
 
-        // 3. 获取商家ID列表，用于后续关联查询
-        const merchantsResult = await aggregate.end()
-        const merchants = merchantsResult.list
+        // 2. 获取商家总数
+        const countResult = await db.collection('merchants').where(query).count()
+        const total = countResult.total
+        console.log('商家总数:', total)
 
-        if (merchants.length === 0) {
+        // 如果没有数据，直接返回
+        if (total === 0) {
             return {
                 success: true,
                 data: {
@@ -63,36 +35,38 @@ exports.main = async (event, context) => {
             }
         }
 
-        const merchantIds = merchants.map(m => m._id)
+        // 3. 分批次获取所有商家数据
+        const batchTimes = Math.ceil(total / MAX_LIMIT)
+        const tasks = []
+        for (let i = 0; i < batchTimes; i++) {
+            const promise = db.collection('merchants')
+                .where(query)
+                .skip(i * MAX_LIMIT)
+                .limit(MAX_LIMIT)
+                .get()
+            tasks.push(promise)
+        }
 
-        // 4. 获取评分数据
-        const ratingsResult = await db.collection('ratings')
-            .where({
-                merchantId: _.in(merchantIds)
-            })
-            .get()
+        // 4. 等待所有查询完成
+        const results = await Promise.all(tasks)
+        let merchants = []
+        results.forEach(result => {
+            merchants = merchants.concat(result.data)
+        })
 
+        // 5. 获取所有评分数据
+        const ratingsResult = await db.collection('ratings').get()
         const ratings = ratingsResult.data
 
-        // 5. 获取评论数据
-        const commentsResult = await db.collection('comments')
-            .where({
-                merchantId: _.in(merchantIds)
-            })
-            .get()
-
+        // 6. 获取所有评论数据
+        const commentsResult = await db.collection('comments').get()
         const comments = commentsResult.data
 
-        // 6. 获取收藏数据
-        const favoritesResult = await db.collection('favorites')
-            .where({
-                merchantId: _.in(merchantIds)
-            })
-            .get()
-
+        // 7. 获取所有收藏数据
+        const favoritesResult = await db.collection('favorites').get()
         const favorites = favoritesResult.data
 
-        // 7. 处理数据，计算评分、评论数和收藏数
+        // 8. 处理数据，计算评分、评论数和收藏数
         const merchantsWithData = merchants.map(merchant => {
             // 处理评分
             const merchantRatings = ratings.filter(r => r.merchantId === merchant._id)
@@ -121,25 +95,25 @@ exports.main = async (event, context) => {
             }
         })
 
-        // 8. 排序
+        // 9. 排序
         let sortedMerchants = merchantsWithData
 
         if (sortBy === 'rating') {
             // 确保将avgRating转换为数字后再排序
             sortedMerchants.forEach(merchant => {
-                merchant.avgRating = parseFloat(merchant.avgRating || 0);
-            });
+                merchant.avgRating = parseFloat(merchant.avgRating || 0)
+            })
 
             // 按评分排序 - 使用明确的降序排序
             sortedMerchants.sort((a, b) => {
                 // 主要按评分排序（降序）
                 if (a.avgRating !== b.avgRating) {
-                    return b.avgRating - a.avgRating;
+                    return b.avgRating - a.avgRating
                 }
 
                 // 评分相同时，按评分数量排序（降序）
-                return (b.ratingCount || 0) - (a.ratingCount || 0);
-            });
+                return (b.ratingCount || 0) - (a.ratingCount || 0)
+            })
         } else if (sortBy === 'default') {
             // 默认排序 - 使用综合排序算法
             sortedMerchants.sort((a, b) => {
@@ -152,22 +126,18 @@ exports.main = async (event, context) => {
             })
         }
 
-        // 9. 分页
-        const total = sortedMerchants.length
-        const paginatedMerchants = sortedMerchants.slice((page - 1) * pageSize, page * pageSize)
-
         return {
             success: true,
             data: {
-                merchants: paginatedMerchants,
+                merchants: sortedMerchants,
                 total: total
             }
         }
     } catch (error) {
-        console.error('搜索云函数执行失败', error)
+        console.error('获取所有商家数据失败:', error)
         return {
             success: false,
-            message: '搜索服务异常，请稍后重试',
+            message: '获取商家数据失败，请稍后重试',
             error: error
         }
     }

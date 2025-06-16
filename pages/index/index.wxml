@@ -8,22 +8,20 @@
 
   <!-- 搜索栏 -->
   <view class="search-container">
-    <view class="search-bar">
-      <icon class="search-icon" type="search" size="14"></icon>
-      <input 
-        class="search-input" 
-        placeholder="搜索商家名称" 
-        confirm-type="search" 
+    <view class="search-box">
+      <icon type="search" size="18" color="#909399" />
+      <input
+        class="search-input"
+        placeholder="搜索商家"
+        confirm-type="search"
         value="{{searchKeyword}}"
+        focus="{{searchFocus}}"
         bindinput="onSearchInput"
         bindconfirm="onSearchConfirm"
         bindfocus="onSearchFocus"
         bindblur="onSearchBlur"
-        focus="{{searchFocus}}"
       />
-      <view class="search-clear" wx:if="{{searchKeyword}}" bindtap="clearSearch">
-        <icon type="clear" size="14"></icon>
-      </view>
+      <icon wx:if="{{searchKeyword}}" type="clear" size="18" color="#909399" bindtap="clearSearch" />
     </view>
     
     <!-- 搜索历史组件 -->
