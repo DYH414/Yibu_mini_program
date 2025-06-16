@@ -32,4 +32,7 @@
     type="primary" 
     loading="{{isLoading}}" 
     bindtap="saveUserInfo">保存</button>
+    
+  <!-- 隐藏的canvas用于图片处理 -->
+  <canvas canvas-id="avatarCanvas" style="width: 300px; height: 300px; position: absolute; left: -1000px; top: -1000px;"></canvas>
 </view> 

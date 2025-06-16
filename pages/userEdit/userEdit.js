@@ -44,12 +44,83 @@ Page({
     chooseAvatar: function () {
         wx.chooseImage({
             count: 1,
-            sizeType: ['compressed'],
+            sizeType: ['compressed'], // 使用压缩图片
             sourceType: ['album', 'camera'],
             success: res => {
                 const tempFilePath = res.tempFilePaths[0]
-                this.uploadAvatar(tempFilePath)
+
+                // 获取图片信息
+                wx.getImageInfo({
+                    src: tempFilePath,
+                    success: imageInfo => {
+                        console.log('选择的图片信息:', imageInfo)
+
+                        // 如果图片尺寸过大，先进行压缩处理
+                        if (imageInfo.width > 300 || imageInfo.height > 300) {
+                            // 使用canvas压缩图片
+                            this.compressImage(tempFilePath, imageInfo)
+                        } else {
+                            // 直接上传小尺寸图片
+                            this.uploadAvatar(tempFilePath)
+                        }
+                    },
+                    fail: err => {
+                        console.error('获取图片信息失败:', err)
+                        // 获取图片信息失败，直接上传原图
+                        this.uploadAvatar(tempFilePath)
+                    }
+                })
             }
+        })
+    },
+
+    // 压缩图片
+    compressImage: function (src, imageInfo) {
+        wx.showLoading({
+            title: '处理图片中...'
+        })
+
+        // 创建离屏canvas
+        const ctx = wx.createCanvasContext('avatarCanvas')
+
+        // 计算压缩后的尺寸，保持宽高比
+        let targetWidth = 300
+        let targetHeight = 300
+
+        // 保持原图比例
+        const ratio = imageInfo.width / imageInfo.height
+        if (ratio > 1) {
+            // 宽图
+            targetHeight = targetWidth / ratio
+        } else {
+            // 高图
+            targetWidth = targetHeight * ratio
+        }
+
+        // 在canvas上绘制图片
+        ctx.drawImage(src, 0, 0, targetWidth, targetHeight)
+        ctx.draw(false, () => {
+            // 将canvas转为图片
+            wx.canvasToTempFilePath({
+                canvasId: 'avatarCanvas',
+                x: 0,
+                y: 0,
+                width: targetWidth,
+                height: targetHeight,
+                quality: 0.8,
+                success: res => {
+                    console.log('图片压缩成功:', res.tempFilePath)
+                    wx.hideLoading()
+                    // 上传压缩后的图片
+                    this.uploadAvatar(res.tempFilePath)
+                },
+                fail: err => {
+                    console.error('图片压缩失败:', err)
+                    wx.hideLoading()
+                    // 压缩失败，使用原图
+                    this.uploadAvatar(src)
+                }
+            })
         })
     },
 
@@ -71,10 +142,9 @@ Page({
                 this.setData({
                     avatarUrl: res.fileID
                 })
-                wx.hideLoading()
-                wx.showToast({
-                    title: '上传成功'
-                })
+
+                // 头像上传成功后自动保存用户信息
+                this.autoSaveUserInfo(res.fileID)
             },
             fail: err => {
                 console.error('上传头像失败', err)
@@ -84,6 +154,114 @@ Page({
                     icon: 'none'
                 })
             }
+        })
+    },
+
+    // 自动保存用户信息（头像更新后）
+    autoSaveUserInfo: function (newAvatarUrl) {
+        const openid = app.globalData.openid
+        const nickname = this.data.nickname
+
+        console.log('自动保存用户信息:', {
+            nickname: nickname,
+            avatarUrl: newAvatarUrl,
+            openid: openid
+        })
+
+        // 使用云函数更新用户信息
+        wx.cloud.callFunction({
+            name: 'fixUserInfo',
+            data: {
+                userInfo: {
+                    nickname: nickname,
+                    avatarUrl: newAvatarUrl
+                }
+            },
+            success: res => {
+                console.log('自动保存用户信息成功:', res.result)
+                wx.hideLoading()
+
+                if (res.result.success) {
+                    // 更新全局用户信息
+                    app.globalData.userInfo = res.result.userInfo
+                    app.globalData.isLogin = true
+
+                    // 更新本地存储
+                    wx.setStorageSync('userInfo', res.result.userInfo)
+
+                    wx.showToast({
+                        title: '头像已更新',
+                        icon: 'success'
+                    })
+                } else {
+                    wx.showToast({
+                        title: '头像已上传，但保存信息失败',
+                        icon: 'none'
+                    })
+                }
+            },
+            fail: err => {
+                console.error('自动保存用户信息失败:', err)
+                wx.hideLoading()
+
+                // 显示头像已上传但保存失败的提示
+                wx.showToast({
+                    title: '头像已上传，但保存信息失败',
+                    icon: 'none'
+                })
+
+                // 备用方案：使用数据库API更新
+                this.autoSaveUserInfoWithDB(newAvatarUrl)
+            }
+        })
+    },
+
+    // 备用方案：使用数据库API自动保存用户信息
+    autoSaveUserInfoWithDB: function (newAvatarUrl) {
+        const db = wx.cloud.database()
+        const openid = app.globalData.openid
+        const nickname = this.data.nickname
+
+        // 使用update方法更新用户信息
+        db.collection('users').doc(openid).update({
+            data: {
+                nickname: nickname,
+                avatarUrl: newAvatarUrl,
+                updateTime: db.serverDate()
+            }
+        }).then(() => {
+            console.log('自动保存用户信息成功（数据库API）')
+
+            // 更新全局用户信息
+            const updatedUserInfo = {
+                _id: openid,
+                nickname: nickname,
+                avatarUrl: newAvatarUrl,
+                updateTime: new Date()
+            };
+
+            // 保留原有的其他字段
+            if (app.globalData.userInfo) {
+                if (app.globalData.userInfo.createTime) {
+                    updatedUserInfo.createTime = app.globalData.userInfo.createTime;
+                }
+            }
+
+            app.globalData.userInfo = updatedUserInfo;
+
+            // 确保本地存储也更新
+            wx.setStorageSync('userInfo', app.globalData.userInfo)
+
+            wx.showToast({
+                title: '头像已更新',
+                icon: 'success'
+            })
+        }).catch(err => {
+            console.error('自动保存用户信息失败（数据库API）', err)
+            wx.showToast({
+                title: '头像已上传，但保存信息失败',
+                icon: 'none'
+            })
         })
     },
 
