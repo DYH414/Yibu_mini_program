@@ -187,6 +187,8 @@ Page({
         if (this.data.sortBy === 'rating') {
             orderField = 'avgRating'
         }
+        // 默认排序时，优先按照isFeatured排序，然后按照createTime排序
+        // 注意：微信小程序云数据库不支持多字段排序，我们需要在获取数据后手动排序
 
         // 分页查询
         query = query.orderBy(orderField, 'desc')
@@ -219,6 +221,16 @@ Page({
                     // 如果是按评分排序，再次排序
                     if (this.data.sortBy === 'rating') {
                         updatedMerchants.sort((a, b) => b.avgRating - a.avgRating)
+                    }
+                    // 如果是默认排序，先按isFeatured排序，再按createTime排序
+                    else if (this.data.sortBy === 'default') {
+                        updatedMerchants.sort((a, b) => {
+                            // 首先按照是否推荐排序（推荐的排在前面）
+                            if (a.isFeatured && !b.isFeatured) return -1;
+                            if (!a.isFeatured && b.isFeatured) return 1;
+                            // 如果推荐状态相同，则按创建时间排序（新的排在前面）
+                            return b.createTime - a.createTime;
+                        });
                     }
 
                     // 合并现有数据和新数据

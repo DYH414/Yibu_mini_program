@@ -57,8 +57,15 @@ exports.main = async (event, context) => {
         if (sortBy === 'rating') {
             sortStage.avgRating = -1
         }
+        // 默认排序时，优先考虑isFeatured字段
+        else if (sortBy === 'default') {
+            // 注意：云数据库聚合不支持多字段排序，我们在后面手动处理
+            sortStage.createTime = -1
+        }
         // 默认按相关性(数据库默认)或创建时间排序
-        sortStage.createTime = -1
+        else {
+            sortStage.createTime = -1
+        }
         aggregate.sort(sortStage)
 
         // 6. 分页查询，并获取总数
@@ -72,8 +79,19 @@ exports.main = async (event, context) => {
             ]
         }).end()
 
-        const merchants = facetRes.list[0].paginatedResults
+        let merchants = facetRes.list[0].paginatedResults
         const totalCount = facetRes.list[0].totalCount.length > 0 ? facetRes.list[0].totalCount[0].count : 0
+
+        // 如果是默认排序，手动处理isFeatured排序
+        if (sortBy === 'default' && merchants.length > 0) {
+            merchants.sort((a, b) => {
+                // 首先按照是否推荐排序（推荐的排在前面）
+                if (a.isFeatured && !b.isFeatured) return -1;
+                if (!a.isFeatured && b.isFeatured) return 1;
+                // 如果推荐状态相同，则按创建时间排序（新的排在前面）
+                return b.createTime - a.createTime;
+            });
+        }
 
         return {
             success: true,
