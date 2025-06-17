@@ -20,7 +20,7 @@
           </view>
         </view>
         <view class="merchant-clicks" wx:if="{{clicksData}}">
-          <image class="clicks-icon" src="/images/icons/fire.png"></image>
+          <view class="clicks-icon"></view>
           <text class="clicks-text">热度 {{clicksData.totalClicks || 0}}</text>
         </view>
       </view>

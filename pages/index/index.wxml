@@ -57,6 +57,9 @@
     <view class="sort-item {{sortBy === 'rating' ? 'active' : ''}}" bindtap="switchSort" data-sort="rating" hover-class="sort-item-hover">
       <text>按评分</text>
     </view>
+    <view class="sort-item {{sortBy === 'clicks' ? 'active' : ''}}" bindtap="switchSort" data-sort="clicks" hover-class="sort-item-hover">
+      <text>按热度</text>
+    </view>
   </view>
 
   <!-- 商家列表 -->
@@ -86,6 +89,11 @@
             </view>
           </view>
           <view class="merchant-desc ellipsis-2">{{item.description}}</view>
+          <!-- 添加热度显示 -->
+          <view class="merchant-clicks" wx:if="{{item.totalClicks}}">
+            <view class="clicks-icon"></view>
+            <text class="clicks-text">热度 {{item.totalClicks}}</text>
+          </view>
         </view>
       </view>
     </block>

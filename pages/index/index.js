@@ -17,7 +17,7 @@ Page({
         currentCategory: 'all',
         merchants: [],
         loading: true,
-        sortBy: 'default', // default 或 rating
+        sortBy: 'default', // default、rating 或 clicks
         isRefreshing: false, // 标记是否正在下拉刷新
         searchKeyword: '', // 搜索关键词
         searchFocus: false, // 搜索框是否聚焦
@@ -653,10 +653,7 @@ Page({
 
     // 加载更多商家数据
     loadMoreMerchants: function () {
-        if (!this.data.hasMore || this.data.isLoadingMore) {
-            return
-        }
-
+        console.log('加载更多商家数据')
         this.setData({
             page: this.data.page + 1,
             isLoadingMore: true
@@ -865,23 +862,31 @@ Page({
                         title: '没有找到相关商家',
                         icon: 'none'
                     });
-                } else if (res.result && res.result.message) {
-                    // 如果有错误消息，显示它
+                } else {
+                    // 显示错误提示
                     wx.showToast({
-                        title: res.result.message,
+                        title: '搜索失败，请重试',
                         icon: 'none'
+                    });
+                    this.setData({
+                        loading: false,
+                        isRefreshing: false,
+                        hasMore: false
                     });
                 }
             }
-
-            // 停止下拉刷新动画
-            wx.stopPullDownRefresh()
         }).catch(err => {
-            console.error('搜索失败', err)
-            this.handleSearchError() // 网络等调用错误，才显示失败
-
-            // 停止下拉刷新动画
-            wx.stopPullDownRefresh()
+            console.error('搜索失败:', err)
+            wx.hideLoading()
+            wx.showToast({
+                title: '搜索失败，请重试',
+                icon: 'none'
+            })
+            this.setData({
+                loading: false,
+                isRefreshing: false,
+                hasMore: false
+            })
         })
     },
 
