@@ -1,0 +1,15 @@
+<view class="agreement-container">
+  <view class="header">
+    <view class="title">{{title}}</view>
+  </view>
+  
+  <scroll-view class="content-scroll" scroll-y>
+    <view class="content">
+      <text>{{content}}</text>
+    </view>
+  </scroll-view>
+  
+  <view class="footer">
+    <button class="btn-confirm" bindtap="handleBack">返回</button>
+  </view>
+</view> 

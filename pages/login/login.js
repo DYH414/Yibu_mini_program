@@ -1,5 +1,6 @@
 // 登录页 JS
 const app = getApp()
+import { userAgreement, privacyPolicy } from '../common/agreements.js'
 
 Page({
     data: {
@@ -76,19 +77,15 @@ Page({
 
     // 显示用户协议
     showUserAgreement: function () {
-        wx.showModal({
-            title: '用户协议',
-            content: '这里是用户协议内容...',
-            showCancel: false
+        wx.navigateTo({
+            url: '/pages/agreement/agreement?type=userAgreement'
         })
     },
 
     // 显示隐私政策
     showPrivacyPolicy: function () {
-        wx.showModal({
-            title: '隐私政策',
-            content: '这里是隐私政策内容...',
-            showCancel: false
+        wx.navigateTo({
+            url: '/pages/agreement/agreement?type=privacyPolicy'
         })
     }
 }) 

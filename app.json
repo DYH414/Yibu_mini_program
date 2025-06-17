@@ -5,7 +5,8 @@
         "pages/merchant/detail",
         "pages/login/login",
         "pages/profile/edit",
-        "pages/search/search"
+        "pages/search/search",
+        "pages/agreement/agreement"
     ],
     "window": {
         "backgroundTextStyle": "light",
