@@ -19,6 +19,10 @@
             <text class="rating-text">{{merchant.avgRating}} ({{merchant.ratingCount}})</text>
           </view>
         </view>
+        <view class="merchant-clicks" wx:if="{{clicksData}}">
+          <image class="clicks-icon" src="/images/icons/fire.png"></image>
+          <text class="clicks-text">热度 {{clicksData.totalClicks || 0}}</text>
+        </view>
       </view>
       <view class="favorite-btn-container {{favoriteAnimating ? 'animate' : ''}}" bindtap="toggleFavorite">
         <view class="favorite-btn">

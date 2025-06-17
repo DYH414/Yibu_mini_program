@@ -487,4 +487,22 @@
   .comment-footer {
     flex-wrap: wrap;
   }
+}
+
+.merchant-clicks {
+  display: flex;
+  align-items: center;
+  margin-top: 10rpx;
+}
+
+.clicks-icon {
+  width: 28rpx;
+  height: 28rpx;
+  margin-right: 8rpx;
+}
+
+.clicks-text {
+  font-size: 24rpx;
+  color: #ff6b6b;
+  font-weight: 500;
 } 

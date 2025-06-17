@@ -62,6 +62,9 @@ Page({
 
         // 使用云函数加载商家详情（优化性能）
         this.loadMerchantDetailWithCloud();
+
+        // 更新商家点击量
+        this.updateMerchantClicks(merchantId);
     },
 
     onShow: function () {
@@ -922,5 +925,34 @@ Page({
                 animating: false
             };
         });
-    }
+    },
+
+    // 更新商家点击量
+    updateMerchantClicks: function (merchantId) {
+        // 获取今天的日期字符串，格式：YYYY-MM-DD
+        const today = new Date();
+        const dateStr = today.getFullYear() + '-' +
+            String(today.getMonth() + 1).padStart(2, '0') + '-' +
+            String(today.getDate()).padStart(2, '0');
+
+        // 使用云函数更新点击量，避免客户端权限问题
+        wx.cloud.callFunction({
+            name: 'updateMerchantClicks',
+            data: {
+                merchantId: merchantId,
+                dateStr: dateStr
+            }
+        }).then(res => {
+            console.log('更新点击量成功:', res);
+
+            // 如果需要显示点击量，可以在这里获取并更新到页面
+            if (res.result && res.result.success) {
+                this.setData({
+                    clicksData: res.result.data
+                });
+            }
+        }).catch(err => {
+            console.error('更新点击量失败:', err);
+        });
+    },
 }) 
