@@ -3,7 +3,8 @@ const app = getApp()
 
 Page({
     data: {
-        isLoading: false
+        isLoading: false,
+        privacyChecked: false
     },
 
     onLoad: function (options) {
@@ -15,7 +16,7 @@ Page({
 
     // 处理微信登录
     handleLogin: function () {
-        if (this.data.isLoading) return
+        if (this.data.isLoading || !this.data.privacyChecked) return
 
         this.setData({ isLoading: true })
 
@@ -47,5 +48,47 @@ Page({
                 url: '/pages/index/index'
             })
         }
+    },
+
+    // 处理隐私政策复选框变化
+    handlePrivacyChange: function (e) {
+        this.setData({
+            privacyChecked: e.detail.value.length > 0
+        })
+    },
+
+    // 处理拒绝按钮点击
+    handleReject: function () {
+        wx.showModal({
+            title: '提示',
+            content: '您需要同意隐私政策才能使用完整功能。如拒绝，将无法登录使用评分、评论等功能。',
+            confirmText: '返回首页',
+            cancelText: '再看看',
+            success: (res) => {
+                if (res.confirm) {
+                    wx.switchTab({
+                        url: '/pages/index/index'
+                    })
+                }
+            }
+        })
+    },
+
+    // 显示用户协议
+    showUserAgreement: function () {
+        wx.showModal({
+            title: '用户协议',
+            content: '这里是用户协议内容...',
+            showCancel: false
+        })
+    },
+
+    // 显示隐私政策
+    showPrivacyPolicy: function () {
+        wx.showModal({
+            title: '隐私政策',
+            content: '这里是隐私政策内容...',
+            showCancel: false
+        })
     }
 }) 

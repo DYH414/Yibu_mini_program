@@ -27,18 +27,34 @@
     </view>
   </view>
 
-  <button 
-    class="login-btn" 
-    type="primary" 
-    bindtap="handleLogin"
-    loading="{{isLoading}}">
-    微信一键登录
-  </button>
-
   <view class="privacy-policy">
-    <text>登录即表示您同意</text>
-    <text class="link">《用户协议》</text>
-    <text>和</text>
-    <text class="link">《隐私政策》</text>
+    <checkbox-group bindchange="handlePrivacyChange">
+      <view class="checkbox-row">
+        <checkbox value="agree" checked="{{privacyChecked}}" />
+        <view class="policy-text">
+          <text>我已阅读并同意</text>
+          <text class="link" bindtap="showUserAgreement">《用户协议》</text>
+          <text>和</text>
+          <text class="link" bindtap="showPrivacyPolicy">《隐私政策》</text>
+        </view>
+      </view>
+    </checkbox-group>
+  </view>
+
+  <view class="button-group">
+    <button 
+      class="login-btn" 
+      type="primary" 
+      bindtap="handleLogin"
+      loading="{{isLoading}}"
+      disabled="{{!privacyChecked}}">
+      微信一键登录
+    </button>
+    
+    <button 
+      class="reject-btn" 
+      bindtap="handleReject">
+      拒绝并退出
+    </button>
   </view>
 </view> 
