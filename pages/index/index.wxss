@@ -262,8 +262,15 @@
 
 .merchant-desc {
   font-size: 26rpx;
-  color: #666;
-  line-height: 1.4;
+  color: #444;
+  line-height: 1.5;
+  margin-top: 10rpx;
+  padding: 12rpx 16rpx;
+  background: linear-gradient(to right, rgba(255, 107, 107, 0.05), rgba(255, 152, 0, 0.05));
+  border-left: 4rpx solid #FF6B6B;
+  border-radius: 6rpx;
+  position: relative;
+  font-weight: 500;
 }
 
 .ellipsis {

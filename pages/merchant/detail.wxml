@@ -19,7 +19,6 @@
             <text class="rating-text">{{merchant.avgRating}} ({{merchant.ratingCount}})</text>
           </view>
         </view>
-        <view class="merchant-desc">{{merchant.description}}</view>
       </view>
       <view class="favorite-btn-container {{favoriteAnimating ? 'animate' : ''}}" bindtap="toggleFavorite">
         <view class="favorite-btn">
@@ -27,6 +26,11 @@
           <text class="favorite-text">{{isFavorite ? '已收藏' : '收藏'}}</text>
         </view>
       </view>
+    </view>
+    
+    <!-- 商家描述 -->
+    <view class="merchant-desc-container">
+      <view class="merchant-desc">{{merchant.description}}</view>
     </view>
   </view>
 

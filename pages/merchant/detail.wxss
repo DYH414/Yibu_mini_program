@@ -83,10 +83,39 @@
   margin-left: 8rpx;
 }
 
+/* 商家描述容器 */
+.merchant-desc-container {
+  margin-top: 24rpx;
+  position: relative;
+  padding-top: 10rpx;
+}
+
 .merchant-desc {
-  font-size: 26rpx;
-  color: #666;
-  line-height: 1.5;
+  font-size: 28rpx;
+  color: #333;
+  line-height: 1.6;
+  margin-top: 16rpx;
+  padding: 16rpx 20rpx;
+  background: linear-gradient(to right, rgba(255, 107, 107, 0.05), rgba(255, 107, 107, 0.1));
+  border-left: 6rpx solid #FF6B6B;
+  border-radius: 8rpx;
+  position: relative;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+  font-weight: 500;
+  letter-spacing: 0.5rpx;
+}
+
+.merchant-desc::before {
+  content: "简介";
+  position: absolute;
+  top: -20rpx;
+  left: 16rpx;
+  background-color: #FF6B6B;
+  color: #fff;
+  font-size: 22rpx;
+  padding: 4rpx 12rpx;
+  border-radius: 12rpx;
+  font-weight: 500;
 }
 
 /* 收藏按钮 */
