@@ -20,11 +20,6 @@
           <text class="stat-label">收藏</text>
           <view class="stat-line {{activeTab === 'favorite' ? 'active-line' : ''}}"></view>
         </view>
-        <view class="stat-item {{activeTab === 'comment' ? 'active-stat' : ''}}" hover-class="stat-hover" bindtap="switchTab" data-tab="comment">
-          <text class="stat-count">{{commentCount}}</text>
-          <text class="stat-label">评论</text>
-          <view class="stat-line {{activeTab === 'comment' ? 'active-line' : ''}}"></view>
-        </view>
         <view class="stat-item {{activeTab === 'rating' ? 'active-stat' : ''}}" hover-class="stat-hover" bindtap="switchTab" data-tab="rating">
           <text class="stat-count">{{ratingCount}}</text>
           <text class="stat-label">评分</text>
@@ -38,7 +33,7 @@
           <image class="default-avatar" src="/images/default-avatar.png"></image>
         </view>
       </view>
-      <text class="login-tip">登录后可评论、收藏与评分</text>
+      <text class="login-tip">登录后可收藏与评分</text>
       <button class="login-btn" bindtap="goToLogin" hover-class="button-hover">立即登录</button>
     </view>
   </view>
@@ -83,56 +78,6 @@
         <view wx:if="{{!loading && favorites.length === 0}}" class="empty-state card">
           <image class="empty-icon" src="/images/icons/empty-favorite.png"></image>
           <text>暂无收藏的商家</text>
-          <view class="empty-action" bindtap="goToIndex" hover-class="button-hover">去浏览商家</view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 评论标签页 -->
-    <view class="tab-content" wx:if="{{activeTab === 'comment'}}">
-      <view class="section-header">
-        <view class="section-title">我的评论</view>
-      </view>
-      <view class="content-list">
-        <block wx:if="{{!loading && comments.length > 0}}">
-          <view 
-            class="content-item card" 
-            wx:for="{{comments}}" 
-            wx:key="_id"
-            hover-class="card-hover">
-            <view 
-              class="content-body" 
-              bindtap="goToMerchantDetail" 
-              data-id="{{item.merchantId}}">
-              <image class="merchant-logo" src="{{item.merchant.logoUrl}}" mode="aspectFill"></image>
-              <view class="merchant-info">
-                <text class="merchant-name ellipsis">{{item.merchant.name}}</text>
-                <view class="comment-content">
-                  <text class="comment-text">{{item.content}}</text>
-                  <text class="comment-time">{{item.formattedTime}}</text>
-                </view>
-              </view>
-            </view>
-            <view class="content-actions">
-              <view class="like-info">
-                <view class="like-icon"></view>
-                <text class="like-count">{{item.likes || 0}}</text>
-              </view>
-              <view 
-                class="action-btn delete-btn" 
-                bindtap="deleteComment" 
-                data-id="{{item._id}}"
-                hover-class="button-hover">
-                <text>删除</text>
-              </view>
-            </view>
-          </view>
-        </block>
-        
-        <!-- 空状态 -->
-        <view wx:if="{{!loading && comments.length === 0}}" class="empty-state card">
-          <image class="empty-icon" src="/images/icons/empty-comment.png"></image>
-          <text>暂无评论记录</text>
           <view class="empty-action" bindtap="goToIndex" hover-class="button-hover">去浏览商家</view>
         </view>
       </view>

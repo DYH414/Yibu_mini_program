@@ -81,57 +81,6 @@
     </view>
   </view>
 
-  <!-- 评论区 -->
-  <view class="comment-section card">
-    <view class="section-title">用户评论</view>
-    
-    <!-- 评论列表 -->
-    <view class="comment-list">
-      <block wx:if="{{!commentLoading && comments.length > 0}}">
-        <view class="comment-item" wx:for="{{comments}}" wx:key="_id">
-          <view class="comment-user">
-            <image class="avatar" src="{{item.user.avatarUrl}}"></image>
-            <text class="user-name">{{item.user.nickname}}</text>
-          </view>
-          <view class="comment-content">{{item.content}}</view>
-          <view class="comment-footer">
-            <text class="comment-time">{{item.timestamp ? item.timestamp.toLocaleDateString() : ''}}</text>
-            <view class="like-btn {{item.isLiked ? 'active' : ''}} {{item.animating ? 'animate' : ''}}" bindtap="likeComment" data-id="{{item._id}}">
-              <image src="/images/icons/{{item.isLiked ? 'like-filled.png' : 'like.png'}}"></image>
-              <text>{{item.likes || 0}}</text>
-              <view class="like-ripple" wx:if="{{!item.isLiked && item.animating}}"></view>
-            </view>
-          </view>
-        </view>
-      </block>
-      
-      <!-- 空状态 -->
-      <view wx:if="{{!commentLoading && comments.length === 0}}" class="empty-state">
-        <image class="empty-image" src="{{emptyCommentImage}}" mode="aspectFit"></image>
-        <text>暂无评论，快来发表第一条评论吧</text>
-      </view>
-      
-      <!-- 加载状态 -->
-      <view wx:if="{{commentLoading}}" class="loading-state">
-        <text>加载中...</text>
-      </view>
-    </view>
-    
-    <!-- 评论输入框 -->
-    <view class="comment-input-area">
-      <input 
-        class="comment-input" 
-        placeholder="{{isLogin ? '写下你的评论...' : '登录后才能评论'}}" 
-        value="{{commentContent}}" 
-        bindinput="inputComment"
-        disabled="{{!isLogin}}"/>
-      <button 
-        class="btn btn-primary comment-submit-btn" 
-        bindtap="submitComment"
-        hover-class="btn-hover"
-        disabled="{{!isLogin || !commentContent}}">发表</button>
-    </view>
-  </view>
 </view>
 
 <!-- 加载状态 -->

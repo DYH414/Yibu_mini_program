@@ -9,17 +9,13 @@ Page({
         merchant: null,
         platforms: [],
         userRating: 0,
-        comments: [],
-        commentContent: '',
         isLogin: false,
         userOpenid: '',
         isFavorite: false,
         loading: true,
-        commentLoading: false,
         ratingSubmitting: false,
         favoriteAnimating: false, // 收藏按钮动画状态
         ratingStars: [], // 评分星星数组
-        emptyCommentImage: '/images/icons/empty-comment.png', // 空评论状态图片
     },
 
     onLoad: function (options) {
@@ -70,9 +66,6 @@ Page({
     onShow: function () {
         // 每次页面显示时重新检查登录状态
         this.checkLoginStatus()
-
-        // 每次页面显示时重新加载评论数据
-        this.loadComments()
     },
 
     onPullDownRefresh: function () {
@@ -110,7 +103,7 @@ Page({
         if (cachedData) {
             console.log('使用缓存的商家详情数据(云函数)');
 
-            // 使用缓存的商家信息和评分，但重新加载评论
+            // 使用缓存的商家信息和评分
             this.setData({
                 merchant: cachedData.merchant,
                 platforms: cachedData.merchant.platforms || [],
@@ -119,9 +112,6 @@ Page({
                 isFavorite: cachedData.isFavorite,
                 loading: false
             });
-
-            // 单独加载最新评论数据
-            this.loadComments();
 
             wx.stopPullDownRefresh();
             return;
@@ -142,22 +132,17 @@ Page({
                 // 生成评分星星数组
                 const ratingStars = this.generateRatingStars(data.merchant.avgRating);
 
-                // 处理评论数据
-                const processedComments = this.processComments(data.comments);
-
                 // 更新页面数据
                 this.setData({
                     merchant: data.merchant,
                     platforms: data.merchant.platforms || [],
                     ratingStars: ratingStars,
-                    comments: processedComments,
                     userRating: data.userRating,
                     isFavorite: data.isFavorite,
-                    loading: false,
-                    commentLoading: false
+                    loading: false
                 });
 
-                // 缓存商家基本数据，但不缓存评论
+                // 缓存商家基本数据
                 app.cache.set(cacheKey, {
                     merchant: data.merchant,
                     userRating: data.userRating,
@@ -201,9 +186,6 @@ Page({
 
             // 分阶段加载其他数据
             setTimeout(() => {
-                // 加载评论数据
-                this.loadComments();
-
                 // 检查用户评分和收藏状态
                 if (this.data.isLogin && this.data.userOpenid) {
                     this.checkUserRating();
@@ -233,11 +215,6 @@ Page({
                         platforms: this.data.platforms,
                         ratingStars: this.data.ratingStars
                     }, 10 * 60 * 1000); // 10分钟缓存
-
-                    // 再加载评论数据
-                    setTimeout(() => {
-                        this.loadComments();
-                    }, 100);
                 });
             })
             .catch(err => {
@@ -343,53 +320,6 @@ Page({
         }
 
         return stars;
-    },
-
-    // 加载评论数据
-    loadComments: function () {
-        this.setData({ commentLoading: true });
-
-        // 获取app实例
-        const app = getApp();
-
-        // 构建缓存键
-        const cacheKey = `merchant_comments_${this.data.merchantId}`;
-
-        // 不使用缓存，确保每次都获取最新的评论数据
-        db.collection('comments')
-            .where({
-                merchantId: this.data.merchantId
-            })
-            .orderBy('likes', 'desc')
-            .get()
-            .then(res => {
-                const comments = res.data;
-
-                // 不再缓存评论数据
-                // app.cache.set(cacheKey, comments, 3 * 60 * 1000); // 3分钟缓存
-
-                if (comments.length === 0) {
-                    this.setData({
-                        comments: [],
-                        commentLoading: false
-                    });
-                    return;
-                }
-
-                // 处理评论数据
-                const processedComments = this.processComments(comments);
-
-                this.setData({
-                    comments: processedComments,
-                    commentLoading: false
-                });
-            })
-            .catch(err => {
-                console.error('获取评论失败', err);
-                this.setData({
-                    commentLoading: false
-                });
-            });
     },
 
     // 检查用户评分
@@ -513,203 +443,6 @@ Page({
                     icon: 'none'
                 })
             })
-    },
-
-    // 提交评论
-    submitComment: function () {
-        if (!this.data.isLogin) {
-            this.goToLogin()
-            return
-        }
-
-        const content = this.data.commentContent.trim()
-
-        if (!content) {
-            wx.showToast({
-                title: '评论内容不能为空',
-                icon: 'none'
-            })
-            return
-        }
-
-        wx.showLoading({ title: '提交中...' })
-
-        // 获取用户信息
-        const userInfo = app.globalData.userInfo || {}
-        const userOpenId = this.data.userOpenid
-
-        // 准备评论数据
-        const commentData = {
-            merchantId: this.data.merchantId,
-            userOpenId: userOpenId,
-            // 为了兼容性，仍然保存当前的用户昵称和头像
-            userNickname: userInfo.nickname || '微信用户',
-            userAvatarUrl: userInfo.avatarUrl || '/images/default-avatar.png',
-            content: content,
-            likes: 0,
-            likedBy: [],
-            timestamp: db.serverDate()
-        }
-
-        db.collection('comments').add({
-            data: commentData
-        }).then(res => {
-            wx.hideLoading()
-            wx.showToast({
-                title: '评论成功',
-                icon: 'success'
-            })
-
-            // 清空评论输入框
-            this.setData({
-                commentContent: ''
-            })
-
-            // 获取新评论的ID
-            const newCommentId = res._id
-
-            // 处理新评论数据，添加到当前评论列表顶部
-            const newComment = {
-                ...commentData,
-                _id: newCommentId,
-                user: {
-                    nickname: userInfo.nickname || '微信用户',
-                    avatarUrl: userInfo.avatarUrl || '/images/default-avatar.png'
-                },
-                isLiked: false,
-                animating: false
-            }
-
-            // 更新评论列表
-            const updatedComments = [newComment, ...this.data.comments]
-
-            // 重新按点赞数排序
-            updatedComments.sort((a, b) => b.likes - a.likes)
-
-            this.setData({
-                comments: updatedComments
-            })
-        }).catch(err => {
-            console.error('提交评论失败', err)
-            wx.hideLoading()
-            wx.showToast({
-                title: '评论失败',
-                icon: 'none'
-            })
-        })
-    },
-
-    // 点赞/取消点赞评论
-    likeComment: function (e) {
-        if (!this.data.isLogin) {
-            this.goToLogin()
-            return
-        }
-
-        const commentId = e.currentTarget.dataset.id
-        const commentIndex = this.data.comments.findIndex(c => c._id === commentId)
-
-        if (commentIndex === -1) return
-
-        const comment = this.data.comments[commentIndex]
-        const isLiked = comment.isLiked
-
-        // 防止重复点击
-        if (comment.animating) return
-
-        // 为当前评论添加动画标记
-        const comments = [...this.data.comments]
-        comments[commentIndex].animating = true
-
-        this.setData({
-            comments: comments
-        })
-
-        // 动画结束后移除动画标记
-        setTimeout(() => {
-            const updatedComments = [...this.data.comments]
-            if (updatedComments[commentIndex]) {
-                updatedComments[commentIndex].animating = false
-                this.setData({
-                    comments: updatedComments
-                })
-            }
-        }, 500)
-
-        if (isLiked) {
-            // 取消点赞
-            // 先获取当前评论数据
-            db.collection('comments').doc(commentId).get().then(res => {
-                const currentComment = res.data
-                const likedBy = currentComment.likedBy || []
-
-                // 移除当前用户的openid
-                const newLikedBy = likedBy.filter(id => id !== this.data.userOpenid)
-
-                // 更新点赞数据
-                return db.collection('comments').doc(commentId).update({
-                    data: {
-                        likes: newLikedBy.length, // 直接设置为新的点赞数量
-                        likedBy: newLikedBy
-                    }
-                })
-            }).then(() => {
-                // 更新本地数据
-                const comments = this.data.comments
-                comments[commentIndex].likes = Math.max(0, comments[commentIndex].likes - 1) // 确保点赞数不为负数
-                comments[commentIndex].isLiked = false
-
-                if (comments[commentIndex].likedBy) {
-                    comments[commentIndex].likedBy = comments[commentIndex].likedBy.filter(id => id !== this.data.userOpenid)
-                }
-
-                // 重新排序
-                comments.sort((a, b) => b.likes - a.likes)
-
-                this.setData({
-                    comments: comments
-                })
-            }).catch(err => {
-                console.error('取消点赞失败', err)
-                wx.showToast({
-                    title: '操作失败',
-                    icon: 'none'
-                })
-            })
-        } else {
-            // 添加点赞
-            db.collection('comments').doc(commentId).update({
-                data: {
-                    likes: _.inc(1),
-                    likedBy: _.push(this.data.userOpenid)
-                }
-            }).then(() => {
-                // 更新本地数据
-                const comments = this.data.comments
-                comments[commentIndex].likes += 1
-                comments[commentIndex].isLiked = true
-
-                // 更新likedBy数组
-                if (!comments[commentIndex].likedBy) {
-                    comments[commentIndex].likedBy = [this.data.userOpenid]
-                } else {
-                    comments[commentIndex].likedBy.push(this.data.userOpenid)
-                }
-
-                // 重新排序
-                comments.sort((a, b) => b.likes - a.likes)
-
-                this.setData({
-                    comments: comments
-                })
-            }).catch(err => {
-                console.error('点赞失败', err)
-                wx.showToast({
-                    title: '操作失败',
-                    icon: 'none'
-                })
-            })
-        }
     },
 
     // 收藏/取消收藏
@@ -863,13 +596,6 @@ Page({
         })
     },
 
-    // 输入评论内容
-    inputComment: function (e) {
-        this.setData({
-            commentContent: e.detail.value
-        })
-    },
-
     // 跳转到登录页
     goToLogin: function () {
         wx.navigateTo({
@@ -896,34 +622,6 @@ Page({
                     icon: 'success'
                 });
             }
-        });
-    },
-
-    // 处理评论数据，添加点赞状态
-    processComments: function (comments) {
-        const userOpenid = this.data.userOpenid;
-
-        return comments.map(comment => {
-            // 添加用户点赞状态
-            const isLiked = comment.likedBy && comment.likedBy.includes(userOpenid);
-
-            // 获取用户信息
-            let user = {
-                nickname: comment.userNickname || '微信用户',
-                avatarUrl: comment.userAvatarUrl || '/images/default-avatar.png'
-            };
-
-            // 如果评论中包含完整的用户信息，则使用它
-            if (comment.user) {
-                user = comment.user;
-            }
-
-            return {
-                ...comment,
-                isLiked: isLiked,
-                user: user,
-                animating: false
-            };
         });
     },
 

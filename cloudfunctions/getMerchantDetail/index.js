@@ -24,7 +24,7 @@ exports.main = async (event, context) => {
         }
 
         // 并行获取所有数据
-        const [merchantResult, ratingsResult, commentsResult, favoriteResult] = await Promise.all([
+        const [merchantResult, ratingsResult, favoriteResult] = await Promise.all([
             // 1. 获取商家基本信息
             db.collection('merchants').doc(merchantId).get(),
 
@@ -33,12 +33,7 @@ exports.main = async (event, context) => {
                 merchantId: merchantId
             }).get(),
 
-            // 3. 获取评论数据
-            db.collection('comments').where({
-                merchantId: merchantId
-            }).orderBy('likes', 'desc').get(),
-
-            // 4. 获取当前用户是否已收藏
+            // 3. 获取当前用户是否已收藏
             userOpenId ? db.collection('favorites').where({
                 merchantId: merchantId,
                 userOpenId: userOpenId
@@ -65,16 +60,6 @@ exports.main = async (event, context) => {
             }
         }
 
-        // 处理评论数据
-        const comments = commentsResult.data.map(comment => {
-            // 当前用户是否点赞过
-            const isLiked = comment.likedBy && comment.likedBy.includes(userOpenId)
-            return {
-                ...comment,
-                isLiked
-            }
-        })
-
         // 处理收藏状态
         const isFavorite = favoriteResult.total > 0
 
@@ -88,7 +73,6 @@ exports.main = async (event, context) => {
                     avgRating
                 },
                 userRating,
-                comments,
                 isFavorite
             }
         }
@@ -100,4 +84,4 @@ exports.main = async (event, context) => {
             error
         }
     }
-} 
+}

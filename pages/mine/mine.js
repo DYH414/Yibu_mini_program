@@ -8,13 +8,11 @@ Page({
         userInfo: {},
         isLogin: false,
         favorites: [],
-        comments: [],
         ratings: [],
         favoriteCount: 0,
-        commentCount: 0,
         ratingCount: 0,
         loading: true,
-        activeTab: 'favorite', // 当前激活的标签页：favorite, comment, rating
+        activeTab: 'favorite', // 当前激活的标签页：favorite, rating
         showContactModal: false,
         phoneNumber: '17805978513'
     },
@@ -119,10 +117,8 @@ Page({
                 isLogin: false,
                 userInfo: {},
                 favorites: [],
-                comments: [],
                 ratings: [],
                 favoriteCount: 0,
-                commentCount: 0,
                 ratingCount: 0,
                 loading: false
             })
@@ -137,9 +133,6 @@ Page({
         switch (this.data.activeTab) {
             case 'favorite':
                 this.loadFavorites()
-                break
-            case 'comment':
-                this.loadComments()
                 break
             case 'rating':
                 this.loadRatings()
@@ -192,44 +185,23 @@ Page({
             this.getDataCountsFromDB();
         });
 
-        // 获取评论数量
-        db.collection('comments')
+        // 获取评分数量
+        db.collection('ratings')
             .where({
                 userOpenId: userOpenId
             })
             .count()
             .then(res => {
-                console.log('评论总数:', res.total);
                 this.setData({
-                    commentCount: res.total
-                });
-            });
-
-        // 获取评分数量 - 修改为只统计不同商家的评分数量
-        db.collection('ratings')
-            .where({
-                userOpenId: userOpenId
-            })
-            .get()
-            .then(res => {
-                console.log('获取到评分数据:', res.data.length, '条');
-                // 使用Set来存储已评分的商家ID，自动去重
-                const merchantIds = new Set();
-                res.data.forEach(rating => {
-                    merchantIds.add(rating.merchantId);
-                });
-
-                // Set的size属性即为不同商家的数量
-                this.setData({
-                    ratingCount: merchantIds.size
-                });
+                    ratingCount: res.total
+                })
             })
             .catch(err => {
-                console.error('获取评分数量失败', err);
-            });
+                console.error('获取评分数量失败', err)
+            })
     },
 
-    // 从数据库直接获取数据计数（作为备用方案）
+    // 直接从数据库获取数据计数
     getDataCountsFromDB: function () {
         const userInfo = app.globalData.userInfo;
         const userOpenId = userInfo._id || userInfo.openid;
@@ -239,28 +211,20 @@ Page({
             return;
         }
 
-        // 获取收藏数量 - 修改为只统计不同商家的收藏数量
+        // 获取收藏数量
         db.collection('favorites')
             .where({
                 userOpenId: userOpenId
             })
-            .get()
+            .count()
             .then(res => {
-                console.log('获取到收藏数据:', res.data.length, '条');
-                // 使用Set来存储已收藏的商家ID，自动去重
-                const merchantIds = new Set();
-                res.data.forEach(favorite => {
-                    merchantIds.add(favorite.merchantId);
-                });
-
-                // Set的size属性即为不同商家的数量
                 this.setData({
-                    favoriteCount: merchantIds.size
-                });
+                    favoriteCount: res.total
+                })
             })
             .catch(err => {
-                console.error('获取收藏数量失败', err);
-            });
+                console.error('获取收藏数量失败', err)
+            })
     },
 
     // 加载收藏数据
@@ -276,104 +240,37 @@ Page({
 
         console.log('加载收藏数据，用户ID:', userOpenId);
 
-        // 显示加载状态
-        this.setData({ loading: true });
+        // 构建缓存键
+        const cacheKey = `user_favorites_${userOpenId}`;
 
-        // 使用云函数获取收藏列表，确保实时性
+        // 使用云函数获取收藏数据
         wx.cloud.callFunction({
             name: 'manageFavorite',
             data: {
                 action: 'list'
             }
         }).then(res => {
-            console.log('云函数获取收藏列表成功:', res);
+            console.log('云函数获取收藏数据成功:', res);
 
             if (res.result && res.result.success) {
-                const favorites = res.result.data || [];
-
-                // 如果没有收藏，直接设置空数组
-                if (favorites.length === 0) {
-                    this.setData({
-                        favorites: [],
-                        loading: false
-                    });
-                    return;
-                }
-
-                // 获取所有商家ID
-                const merchantIds = favorites.map(item => item.merchantId);
-
-                // 批量获取商家信息
-                this.batchGetMerchants(merchantIds).then(merchants => {
-                    // 创建一个商家ID到商家信息的Map，方便快速查找
-                    const merchantMap = new Map(merchants.map(m => [m._id, m]));
-
-                    // 将商家信息添加到收藏数据中
-                    const favoritesWithMerchant = favorites.map((favorite) => {
-                        // 从Map中直接获取商家信息
-                        const merchant = merchantMap.get(favorite.merchantId) || {};
-                        return {
-                            ...favorite,
-                            merchant: merchant
-                        };
-                    }).filter(f => f.merchant && f.merchant._id); // 过滤掉那些找不到对应商家的收藏
-
-                    // 缓存结果
-                    const cacheKey = `user_favorites_${userOpenId}`;
-                    app.cache.set(cacheKey, favoritesWithMerchant, 1 * 60 * 1000); // 1分钟缓存，减少过期时间
-
-                    this.setData({
-                        favorites: favoritesWithMerchant,
-                        loading: false
-                    });
-                }).catch(err => {
-                    console.error('获取商家信息失败', err);
-                    this.setData({ loading: false });
-                    wx.showToast({
-                        title: '加载失败，请重试',
-                        icon: 'none'
-                    });
-                });
+                // 处理收藏数据
+                this.processFavorites(res.result.data || []);
             } else {
-                console.error('云函数返回错误:', res);
-                this.setData({ loading: false });
-                wx.showToast({
-                    title: '加载失败，请重试',
-                    icon: 'none'
-                });
+                console.error('云函数返回错误:', res.result);
+                // 如果云函数调用失败，回退到直接查询
+                this.loadFavoritesFromDB();
             }
         }).catch(err => {
             console.error('调用云函数失败:', err);
-            // 如果云函数调用失败，回退到原来的方式
+            // 如果云函数调用失败，回退到直接查询
             this.loadFavoritesFromDB();
         });
     },
 
-    // 从数据库直接加载收藏（作为备用方案）
+    // 直接从数据库加载收藏数据
     loadFavoritesFromDB: function () {
         const userInfo = app.globalData.userInfo;
         const userOpenId = userInfo._id || userInfo.openid;
-
-        if (!userOpenId) {
-            console.error('无法获取用户ID');
-            this.setData({ loading: false });
-            return;
-        }
-
-        console.log('从数据库加载收藏数据，用户ID:', userOpenId);
-
-        // 尝试从缓存获取数据
-        const cacheKey = `user_favorites_${userOpenId}`;
-        const cachedData = app.cache.get(cacheKey);
-
-        if (cachedData) {
-            console.log('使用缓存的收藏数据');
-            this.setData({
-                favorites: cachedData,
-                loading: false
-            });
-            return;
-        }
 
         db.collection('favorites')
             .where({
@@ -382,163 +279,64 @@ Page({
             .orderBy('timestamp', 'desc')
             .get()
             .then(res => {
-                console.log('获取到收藏数据:', res.data.length, '条');
-                const favorites = res.data;
-
-                // 如果没有收藏，直接设置空数组
-                if (favorites.length === 0) {
-                    this.setData({
-                        favorites: [],
-                        loading: false
-                    });
-                    return;
-                }
-
-                // 获取所有商家ID
-                const merchantIds = favorites.map(item => item.merchantId);
-
-                // 批量获取商家信息
-                this.batchGetMerchants(merchantIds).then(merchants => {
-                    // 创建一个商家ID到商家信息的Map，方便快速查找
-                    const merchantMap = new Map(merchants.map(m => [m._id, m]));
-
-                    // 将商家信息添加到收藏数据中
-                    const favoritesWithMerchant = favorites.map((favorite) => {
-                        // 从Map中直接获取商家信息
-                        const merchant = merchantMap.get(favorite.merchantId) || {};
-                        return {
-                            ...favorite,
-                            merchant: merchant
-                        };
-                    }).filter(f => f.merchant && f.merchant._id); // 过滤掉那些找不到对应商家的收藏
-
-                    // 缓存结果
-                    app.cache.set(cacheKey, favoritesWithMerchant, 1 * 60 * 1000); // 1分钟缓存
-
-                    this.setData({
-                        favorites: favoritesWithMerchant,
-                        loading: false
-                    });
-                }).catch(err => {
-                    console.error('获取商家信息失败', err);
-                    this.setData({ loading: false });
-                    wx.showToast({
-                        title: '加载失败，请重试',
-                        icon: 'none'
-                    });
-                });
+                // 处理收藏数据
+                this.processFavorites(res.data);
             })
             .catch(err => {
                 console.error('获取收藏失败', err);
                 this.setData({ loading: false });
-                wx.showToast({
-                    title: '加载失败，请重试',
-                    icon: 'none'
-                });
             });
     },
 
-    // 批量获取商家信息
-    batchGetMerchants: function (merchantIds) {
-        // 尝试从缓存获取数据
-        const cacheKey = `batch_merchants_${merchantIds.join('_')}`;
-        const cachedData = app.cache.get(cacheKey);
-
-        if (cachedData) {
-            console.log('使用缓存的商家数据');
-            return Promise.resolve(cachedData);
-        }
-
-        // 批量获取商家信息
-        const tasks = merchantIds.map(id => {
-            return db.collection('merchants').doc(id).get();
-        });
-
-        // 并行执行所有查询
-        return Promise.all(tasks)
-            .then(results => {
-                const merchants = results.map(res => res.data);
-
-                // 缓存结果
-                app.cache.set(cacheKey, merchants, 10 * 60 * 1000); // 10分钟缓存
-
-                return merchants;
+    // 处理收藏数据
+    processFavorites: function (favorites) {
+        if (!favorites || favorites.length === 0) {
+            this.setData({
+                favorites: [],
+                loading: false
             });
-    },
-
-    // 加载评论数据
-    loadComments: function () {
-        const userInfo = app.globalData.userInfo;
-        const userOpenId = userInfo._id || userInfo.openid;
-
-        if (!userOpenId) {
-            console.error('无法获取用户ID');
-            this.setData({ loading: false });
             return;
         }
 
-        console.log('加载评论数据，用户ID:', userOpenId);
+        // 提取所有商家ID
+        const merchantIds = favorites.map(f => f.merchantId);
 
-        db.collection('comments')
+        // 批量获取商家信息
+        const _ = db.command;
+        db.collection('merchants')
             .where({
-                userOpenId: userOpenId
+                _id: _.in(merchantIds)
             })
-            .orderBy('timestamp', 'desc')
             .get()
             .then(res => {
-                console.log('获取到评论数据:', res.data.length, '条');
-                const comments = res.data;
+                const merchants = res.data;
+                const merchantMap = {};
 
-                // 如果没有评论，直接设置空数组
-                if (comments.length === 0) {
-                    this.setData({
-                        comments: [],
-                        loading: false
-                    });
-                    return;
-                }
-
-                // 获取所有商家ID
-                const merchantIds = comments.map(item => item.merchantId);
-
-                // 批量获取商家信息
-                const tasks = merchantIds.map(id => {
-                    return db.collection('merchants').doc(id).get();
+                // 创建商家ID到商家信息的映射
+                merchants.forEach(m => {
+                    merchantMap[m._id] = m;
                 });
 
-                // 并行执行所有查询
-                Promise.all(tasks)
-                    .then(results => {
-                        // 将商家信息添加到评论数据中，并格式化时间
-                        const commentsWithMerchant = comments.map((comment, index) => {
-                            return {
-                                ...comment,
-                                merchant: results[index].data,
-                                formattedTime: this.formatTime(comment.timestamp)
-                            };
-                        });
+                // 合并收藏和商家信息
+                const processedFavorites = favorites.map(favorite => {
+                    return {
+                        ...favorite,
+                        merchant: merchantMap[favorite.merchantId] || {
+                            name: '未知商家',
+                            description: '该商家可能已被删除',
+                            logoUrl: '/images/default-logo.png'
+                        }
+                    };
+                });
 
-                        this.setData({
-                            comments: commentsWithMerchant,
-                            loading: false
-                        });
-                    })
-                    .catch(err => {
-                        console.error('获取商家信息失败', err);
-                        this.setData({ loading: false });
-                        wx.showToast({
-                            title: '加载失败，请重试',
-                            icon: 'none'
-                        });
-                    });
+                this.setData({
+                    favorites: processedFavorites,
+                    loading: false
+                });
             })
             .catch(err => {
-                console.error('获取评论失败', err);
+                console.error('获取商家信息失败', err);
                 this.setData({ loading: false });
-                wx.showToast({
-                    title: '加载失败，请重试',
-                    icon: 'none'
-                });
             });
     },
 
@@ -547,14 +345,6 @@ Page({
         const userInfo = app.globalData.userInfo;
         const userOpenId = userInfo._id || userInfo.openid;
 
-        if (!userOpenId) {
-            console.error('无法获取用户ID');
-            this.setData({ loading: false });
-            return;
-        }
-
-        console.log('加载评分数据，用户ID:', userOpenId);
-
         db.collection('ratings')
             .where({
                 userOpenId: userOpenId
@@ -562,11 +352,9 @@ Page({
             .orderBy('timestamp', 'desc')
             .get()
             .then(res => {
-                console.log('获取到评分数据:', res.data.length, '条');
-                const allRatings = res.data;
+                const ratings = res.data;
 
-                // 如果没有评分，直接设置空数组
-                if (allRatings.length === 0) {
+                if (ratings.length === 0) {
                     this.setData({
                         ratings: [],
                         loading: false
@@ -574,163 +362,117 @@ Page({
                     return;
                 }
 
-                // 对评分进行处理，只保留每个商家的最新评分
-                const merchantMap = new Map(); // 用于存储每个商家的最新评分
-
-                allRatings.forEach(rating => {
-                    // 如果商家ID不在Map中，或者当前评分比Map中的更新，则更新Map
-                    if (!merchantMap.has(rating.merchantId) ||
-                        rating.timestamp > merchantMap.get(rating.merchantId).timestamp) {
-                        merchantMap.set(rating.merchantId, rating);
-                    }
-                });
-
-                // 将Map转换为数组
-                const latestRatings = Array.from(merchantMap.values());
-
-                // 获取所有商家ID
-                const merchantIds = latestRatings.map(item => item.merchantId);
+                // 提取所有商家ID
+                const merchantIds = ratings.map(r => r.merchantId);
 
                 // 批量获取商家信息
-                const tasks = merchantIds.map(id => {
-                    return db.collection('merchants').doc(id).get();
-                });
+                const _ = db.command;
+                db.collection('merchants')
+                    .where({
+                        _id: _.in(merchantIds)
+                    })
+                    .get()
+                    .then(res => {
+                        const merchants = res.data;
+                        const merchantMap = {};
 
-                // 并行执行所有查询
-                Promise.all(tasks)
-                    .then(results => {
-                        // 将商家信息添加到评分数据中，并格式化时间和星星数组
-                        const ratingsWithMerchant = latestRatings.map((rating, index) => {
-                            // 生成星星数组，用于展示
+                        // 创建商家ID到商家信息的映射
+                        merchants.forEach(m => {
+                            merchantMap[m._id] = m;
+                        });
+
+                        // 处理评分数据
+                        const processedRatings = ratings.map(rating => {
+                            // 处理时间
+                            let formattedTime = '';
+                            if (rating.timestamp) {
+                                const date = new Date(rating.timestamp);
+                                formattedTime = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+                            }
+
+                            // 生成星星数组
                             const starArray = [];
                             for (let i = 0; i < 5; i++) {
-                                if (i < rating.score) {
-                                    starArray.push('full');
-                                } else {
-                                    starArray.push('empty');
-                                }
+                                starArray.push(i < rating.score ? 'full' : 'empty');
                             }
 
                             return {
                                 ...rating,
-                                merchant: results[index].data,
-                                formattedTime: this.formatTime(rating.timestamp),
-                                starArray: starArray
+                                formattedTime,
+                                starArray,
+                                merchant: merchantMap[rating.merchantId] || {
+                                    name: '未知商家',
+                                    description: '该商家可能已被删除',
+                                    logoUrl: '/images/default-logo.png'
+                                }
                             };
                         });
 
                         this.setData({
-                            ratings: ratingsWithMerchant,
+                            ratings: processedRatings,
                             loading: false
                         });
                     })
                     .catch(err => {
                         console.error('获取商家信息失败', err);
                         this.setData({ loading: false });
-                        wx.showToast({
-                            title: '加载失败，请重试',
-                            icon: 'none'
-                        });
                     });
             })
             .catch(err => {
                 console.error('获取评分失败', err);
                 this.setData({ loading: false });
-                wx.showToast({
-                    title: '加载失败，请重试',
-                    icon: 'none'
-                });
             });
-    },
-
-    // 格式化时间
-    formatTime: function (timestamp) {
-        if (!timestamp) return ''
-
-        const date = new Date(timestamp)
-        const year = date.getFullYear()
-        const month = (date.getMonth() + 1).toString().padStart(2, '0')
-        const day = date.getDate().toString().padStart(2, '0')
-
-        return `${year}-${month}-${day}`
     },
 
     // 取消收藏
     cancelFavorite: function (e) {
-        const favoriteId = e.currentTarget.dataset.id
+        const id = e.currentTarget.dataset.id
+        const index = this.data.favorites.findIndex(f => f._id === id)
 
-        wx.showModal({
-            title: '取消收藏',
-            content: '确定要取消收藏该商家吗？',
-            success: res => {
-                if (res.confirm) {
-                    wx.showLoading({
-                        title: '处理中',
-                        mask: true
-                    })
+        if (index === -1) return
 
-                    db.collection('favorites').doc(favoriteId).remove()
-                        .then(() => {
-                            wx.hideLoading()
-                            wx.showToast({
-                                title: '已取消收藏',
-                                icon: 'success'
-                            })
-
-                            // 重新加载收藏数据
-                            this.loadFavorites()
-                            // 更新计数
-                            this.getDataCounts()
-                        })
-                        .catch(err => {
-                            wx.hideLoading()
-                            console.error('取消收藏失败', err)
-                            wx.showToast({
-                                title: '操作失败，请重试',
-                                icon: 'none'
-                            })
-                        })
-                }
-            }
+        wx.showLoading({
+            title: '处理中',
+            mask: true
         })
+
+        db.collection('favorites').doc(id).remove()
+            .then(() => {
+                wx.hideLoading()
+                wx.showToast({
+                    title: '已取消收藏',
+                    icon: 'success'
+                })
+
+                // 更新收藏列表
+                const favorites = [...this.data.favorites]
+                favorites.splice(index, 1)
+
+                this.setData({
+                    favorites: favorites,
+                    favoriteCount: Math.max(0, this.data.favoriteCount - 1)
+                })
+            })
+            .catch(err => {
+                wx.hideLoading()
+                console.error('取消收藏失败', err)
+                wx.showToast({
+                    title: '操作失败，请重试',
+                    icon: 'none'
+                })
+            })
     },
 
-    // 删除评论
-    deleteComment: function (e) {
-        const commentId = e.currentTarget.dataset.id
-
-        wx.showModal({
-            title: '删除评论',
-            content: '确定要删除该评论吗？',
+    // 清理所有用户的重复收藏记录
+    cleanAllDuplicates: function () {
+        console.log('清理所有用户的重复记录')
+        wx.cloud.callFunction({
+            name: 'cleanAllDuplicates',
             success: res => {
-                if (res.confirm) {
-                    wx.showLoading({
-                        title: '处理中',
-                        mask: true
-                    })
-
-                    db.collection('comments').doc(commentId).remove()
-                        .then(() => {
-                            wx.hideLoading()
-                            wx.showToast({
-                                title: '评论已删除',
-                                icon: 'success'
-                            })
-
-                            // 重新加载评论数据
-                            this.loadComments()
-                            // 更新计数
-                            this.getDataCounts()
-                        })
-                        .catch(err => {
-                            wx.hideLoading()
-                            console.error('删除评论失败', err)
-                            wx.showToast({
-                                title: '操作失败，请重试',
-                                icon: 'none'
-                            })
-                        })
-                }
+                console.log('清理重复记录成功:', res.result)
+            },
+            fail: err => {
+                console.error('清理重复记录失败:', err)
             }
         })
     },
@@ -752,67 +494,32 @@ Page({
         })
     },
 
-    // 前往商家详情页
+    // 跳转到商家详情页
     goToMerchantDetail: function (e) {
-        const merchantId = e.currentTarget.dataset.id
+        const id = e.currentTarget.dataset.id
         wx.navigateTo({
-            url: `/pages/merchant/detail?id=${merchantId}`
+            url: '/pages/merchant/detail?id=' + id
         })
     },
 
-    // 前往首页
+    // 跳转到首页
     goToIndex: function () {
         wx.switchTab({
             url: '/pages/index/index'
         })
     },
 
-    // 前往登录页
+    // 跳转到登录页
     goToLogin: function () {
         wx.navigateTo({
             url: '/pages/login/login'
         })
     },
 
-    // 前往编辑资料页
+    // 跳转到个人资料编辑页
     goToEditProfile: function () {
         wx.navigateTo({
             url: '/pages/profile/edit'
-        })
-    },
-
-    // 退出登录
-    logout: function () {
-        wx.showModal({
-            title: '退出登录',
-            content: '确定要退出登录吗？',
-            success: res => {
-                if (res.confirm) {
-                    // 清除全局数据
-                    app.globalData.userInfo = null
-                    app.globalData.isLogin = false
-                    app.globalData.openid = null
-
-                    // 清除本地存储
-                    wx.removeStorageSync('openid')
-                    wx.removeStorageSync('userInfo')
-
-                    // 更新页面状态
-                    this.setData({
-                        isLogin: false,
-                        userInfo: {},
-                        favorites: [],
-                        favoriteCount: 0,
-                        commentCount: 0,
-                        ratingCount: 0
-                    })
-
-                    wx.showToast({
-                        title: '已退出登录',
-                        icon: 'success'
-                    })
-                }
-            }
         })
     },
 
@@ -830,12 +537,7 @@ Page({
         })
     },
 
-    // 阻止冒泡
-    stopPropagation: function () {
-        return
-    },
-
-    // 复制电话号码
+    // 复制手机号
     copyPhoneNumber: function () {
         wx.setClipboardData({
             data: this.data.phoneNumber,
@@ -851,31 +553,46 @@ Page({
     // 拨打电话
     callPhoneNumber: function () {
         wx.makePhoneCall({
-            phoneNumber: this.data.phoneNumber,
-            fail: () => {
-                wx.showToast({
-                    title: '拨号取消',
-                    icon: 'none'
-                })
-            }
+            phoneNumber: this.data.phoneNumber
         })
     },
 
-    // 清理所有用户的重复收藏记录
-    cleanAllDuplicates: function () {
-        // 调用云函数清理重复收藏
-        wx.cloud.callFunction({
-            name: 'cleanAllDuplicates',
+    // 阻止事件冒泡
+    stopPropagation: function () {
+        return
+    },
+
+    // 退出登录
+    logout: function () {
+        wx.showModal({
+            title: '退出登录',
+            content: '确定要退出登录吗？',
             success: res => {
-                console.log('清理重复收藏成功:', res.result)
-                if (res.result.deleted > 0) {
-                    // 如果有删除记录，重新加载数据
-                    this.loadUserData()
+                if (res.confirm) {
+                    // 清除登录状态
+                    app.globalData.isLogin = false
+                    app.globalData.userInfo = null
+                    app.globalData.openid = ''
+
+                    // 清除本地存储
+                    wx.removeStorageSync('userInfo')
+
+                    // 更新页面状态
+                    this.setData({
+                        isLogin: false,
+                        userInfo: {},
+                        favorites: [],
+                        ratings: [],
+                        favoriteCount: 0,
+                        ratingCount: 0
+                    })
+
+                    wx.showToast({
+                        title: '已退出登录',
+                        icon: 'success'
+                    })
                 }
-            },
-            fail: err => {
-                console.error('清理重复收藏失败:', err)
             }
         })
     }
-}) 
+})
