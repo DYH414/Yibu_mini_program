@@ -26,7 +26,7 @@ App({
             // 缓存时间记录
             timestamps: {},
             // 默认缓存时间（5分钟）
-            defaultExpireTime: 5 * 60 * 1000,
+            defaultExpireTime: 3 * 60 * 1000,
 
             // 设置缓存
             set: function (key, value, expireTime = this.defaultExpireTime) {
