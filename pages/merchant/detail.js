@@ -69,7 +69,7 @@ Page({
     },
 
     onPullDownRefresh: function () {
-        this.loadMerchantData()
+        this.loadMerchantDetailWithCloud(); // 统一入口，优先云函数
     },
 
     // 检查登录状态
@@ -82,13 +82,11 @@ Page({
             userOpenid: openid || ''
         })
 
-        if (isLogin && openid) {
-            this.checkUserRating()
-            this.checkFavoriteStatus()
-        }
+        // 登录状态变化或OpenID更新后，统一加载商家详情
+        this.loadMerchantDetailWithCloud();
     },
 
-    // 使用云函数加载商家详情
+    // 使用云函数加载商家详情（主入口）
     loadMerchantDetailWithCloud: function () {
         this.setData({ loading: true });
 
@@ -102,8 +100,6 @@ Page({
         const cachedData = app.cache.get(cacheKey);
         if (cachedData) {
             console.log('使用缓存的商家详情数据(云函数)');
-
-            // 使用缓存的商家信息和评分
             this.setData({
                 merchant: cachedData.merchant,
                 platforms: cachedData.merchant.platforms || [],
@@ -112,7 +108,6 @@ Page({
                 isFavorite: cachedData.isFavorite,
                 loading: false
             });
-
             wx.stopPullDownRefresh();
             return;
         }
@@ -121,18 +116,15 @@ Page({
         wx.cloud.callFunction({
             name: 'getMerchantDetail',
             data: {
-                merchantId: this.data.merchantId
+                merchantId: this.data.merchantId,
+                userOpenId: this.data.userOpenid // 传递用户openid以获取用户专属数据
             }
         }).then(res => {
             console.log('云函数获取商家详情成功:', res);
 
             if (res.result && res.result.success) {
                 const data = res.result.data;
-
-                // 生成评分星星数组
                 const ratingStars = this.generateRatingStars(data.merchant.avgRating);
-
-                // 更新页面数据
                 this.setData({
                     merchant: data.merchant,
                     platforms: data.merchant.platforms || [],
@@ -141,8 +133,6 @@ Page({
                     isFavorite: data.isFavorite,
                     loading: false
                 });
-
-                // 缓存商家基本数据
                 app.cache.set(cacheKey, {
                     merchant: data.merchant,
                     userRating: data.userRating,
@@ -150,14 +140,13 @@ Page({
                 }, 5 * 60 * 1000); // 5分钟缓存
             } else {
                 console.error('云函数返回错误:', res.result);
-                // 如果云函数调用失败，回退到分步加载
+                // 云函数失败时兜底本地加载
                 this.loadMerchantData();
             }
-
             wx.stopPullDownRefresh();
         }).catch(err => {
             console.error('调用云函数失败:', err);
-            // 如果云函数调用失败，回退到分步加载
+            // 云函数失败时兜底本地加载
             this.loadMerchantData();
             wx.stopPullDownRefresh();
         });
