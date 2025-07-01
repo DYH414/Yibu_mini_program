@@ -61,11 +61,29 @@ Page({
 
         // 更新商家点击量
         this.updateMerchantClicks(merchantId);
+
+        // 设置缓存事件监听
+        this.setupCacheEventListeners();
+    },
+
+    onUnload: function () {
+        // 页面卸载时移除事件监听
+        const app = getApp();
+        if (app.cacheEvents && app.cacheEvents.listeners) {
+            // 移除事件监听器的引用
+            app.cacheEvents.listeners['merchantDataUpdated'] =
+                app.cacheEvents.listeners['merchantDataUpdated']?.filter(
+                    listener => listener !== this.onMerchantDataUpdated
+                );
+        }
     },
 
     onShow: function () {
         // 每次页面显示时重新检查登录状态
-        this.checkLoginStatus()
+        this.checkLoginStatus();
+
+        // 检查缓存是否需要刷新
+        this.checkCacheRefresh();
     },
 
     onPullDownRefresh: function () {
@@ -393,14 +411,37 @@ Page({
                             timestamp: db.serverDate()
                         }
                     }).then(() => {
+                        // 立即更新UI显示
                         this.setData({
                             userRating: rating,
                             ratingSubmitting: false
                         })
-                        this.loadRatingData()
+
+                        // 更新商家平均评分
+                        this.loadRatingData().then(() => {
+                            // 更新缓存
+                            const app = getApp()
+                            const cacheKey = `merchant_detail_cloud_${this.data.merchantId}`
+                            const cachedData = app.cache.get(cacheKey)
+                            if (cachedData) {
+                                cachedData.userRating = rating
+                                app.cache.set(cacheKey, cachedData)
+                            }
+
+                            wx.showToast({
+                                title: '评分更新成功',
+                                icon: 'success'
+                            })
+
+                            // 使相关缓存失效
+                            this.invalidateRelatedCaches()
+                        })
+                    }).catch(err => {
+                        console.error('更新评分失败', err)
+                        this.setData({ ratingSubmitting: false })
                         wx.showToast({
-                            title: '评分更新成功',
-                            icon: 'success'
+                            title: '评分失败',
+                            icon: 'none'
                         })
                     })
                 } else {
@@ -413,14 +454,37 @@ Page({
                             timestamp: db.serverDate()
                         }
                     }).then(() => {
+                        // 立即更新UI显示
                         this.setData({
                             userRating: rating,
                             ratingSubmitting: false
                         })
-                        this.loadRatingData()
+
+                        // 更新商家平均评分
+                        this.loadRatingData().then(() => {
+                            // 更新缓存
+                            const app = getApp()
+                            const cacheKey = `merchant_detail_cloud_${this.data.merchantId}`
+                            const cachedData = app.cache.get(cacheKey)
+                            if (cachedData) {
+                                cachedData.userRating = rating
+                                app.cache.set(cacheKey, cachedData)
+                            }
+
+                            wx.showToast({
+                                title: '评分成功',
+                                icon: 'success'
+                            })
+
+                            // 使相关缓存失效
+                            this.invalidateRelatedCaches()
+                        })
+                    }).catch(err => {
+                        console.error('提交评分失败', err)
+                        this.setData({ ratingSubmitting: false })
                         wx.showToast({
-                            title: '评分成功',
-                            icon: 'success'
+                            title: '评分失败',
+                            icon: 'none'
                         })
                     })
                 }
@@ -433,6 +497,24 @@ Page({
                     icon: 'none'
                 })
             })
+    },
+
+    // 使相关缓存失效
+    invalidateRelatedCaches: function (type) {
+        const app = getApp()
+
+        // 使商家详情相关缓存失效
+        app.invalidateCacheByPrefix(`merchant_detail_${this.data.merchantId}`)
+        app.invalidateCacheByPrefix(`merchant_ratings_${this.data.merchantId}`)
+
+        // 使首页商家列表缓存失效
+        app.invalidateCacheByPrefix('merchants_')
+
+        // 通知其他页面可能需要刷新
+        app.cacheEvents.emit('merchantDataUpdated', {
+            merchantId: this.data.merchantId,
+            type: type || 'rating'
+        })
     },
 
     // 收藏/取消收藏
@@ -491,6 +573,9 @@ Page({
                     cachedData.isFavorite = !isFavorite
                     app.cache.set(cacheKey, cachedData)
                 }
+
+                // 使相关缓存失效
+                this.invalidateRelatedCaches('favorite')
             } else {
                 // 操作失败
                 console.error('收藏操作失败:', res)
@@ -603,5 +688,45 @@ Page({
         }).catch(err => {
             console.error('更新点击量失败:', err);
         });
+    },
+
+    // 设置缓存事件监听
+    setupCacheEventListeners: function () {
+        const app = getApp();
+        if (app.cacheEvents) {
+            // 商家数据更新事件
+            this.onMerchantDataUpdated = (data) => {
+                console.log('商家详情页收到数据更新事件:', data);
+                // 如果更新的是当前商家，刷新数据
+                if (data.merchantId === this.data.merchantId) {
+                    console.log('当前商家数据已更新，刷新页面');
+                    this.loadMerchantDetailWithCloud();
+                }
+            };
+
+            // 注册事件监听
+            app.cacheEvents.on('merchantDataUpdated', this.onMerchantDataUpdated);
+        }
+    },
+
+    // 检查缓存是否需要刷新
+    checkCacheRefresh: function () {
+        const app = getApp();
+        const cacheKey = `merchant_detail_cloud_${this.data.merchantId}`;
+        const cachedData = app.cache.get(cacheKey);
+
+        // 如果没有缓存或缓存已过期，重新加载数据
+        if (!cachedData) {
+            console.log('商家详情缓存不存在或已过期，重新加载');
+            this.loadMerchantDetailWithCloud();
+            return;
+        }
+
+        // 如果上次访问时间超过2分钟，刷新数据
+        const timestamp = app.cache.timestamps[cacheKey];
+        if (timestamp && (Date.now() - timestamp.lastAccess > 2 * 60 * 1000)) {
+            console.log('商家详情数据已超过2分钟未更新，刷新数据');
+            this.loadMerchantDetailWithCloud();
+        }
     },
 }) 

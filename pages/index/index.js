@@ -35,6 +35,26 @@ Page({
         // 清除缓存，确保使用最新排序逻辑
         this.clearMerchantCache()
         this.loadMerchants()
+
+        // 监听缓存事件，当商家数据更新时刷新列表
+        this.setupCacheEventListeners()
+    },
+
+    onUnload: function () {
+        // 页面卸载时移除事件监听
+        const app = getApp()
+        if (app.cacheEvents && app.cacheEvents.listeners) {
+            // 移除事件监听器的引用
+            app.cacheEvents.listeners['merchantDataUpdated'] =
+                app.cacheEvents.listeners['merchantDataUpdated']?.filter(
+                    listener => listener !== this.onMerchantDataUpdated
+                )
+
+            app.cacheEvents.listeners['cacheInvalidated'] =
+                app.cacheEvents.listeners['cacheInvalidated']?.filter(
+                    listener => listener !== this.onCacheInvalidated
+                )
+        }
     },
 
     /**
@@ -976,6 +996,45 @@ Page({
 
             // 重新加载数据
             this.loadMerchants()
+        }
+    },
+
+    // 设置缓存事件监听
+    setupCacheEventListeners: function () {
+        const app = getApp()
+        if (app.cacheEvents) {
+            // 商家数据更新事件
+            this.onMerchantDataUpdated = (data) => {
+                console.log('收到商家数据更新事件:', data)
+                // 如果当前不在刷新状态，且不是加载更多状态，则刷新数据
+                if (!this.data.isRefreshing && !this.data.isLoadingMore) {
+                    this.setData({
+                        page: 1,
+                        isRefreshing: true
+                    })
+                    this.loadMerchants()
+                }
+            }
+
+            // 缓存失效事件
+            this.onCacheInvalidated = (data) => {
+                console.log('收到缓存失效事件:', data)
+                // 如果是merchants_前缀的缓存被失效，刷新商家列表
+                if (data.prefix && data.prefix.startsWith('merchants_')) {
+                    // 如果当前不在刷新状态，且不是加载更多状态，则刷新数据
+                    if (!this.data.isRefreshing && !this.data.isLoadingMore) {
+                        this.setData({
+                            page: 1,
+                            isRefreshing: true
+                        })
+                        this.loadMerchants()
+                    }
+                }
+            }
+
+            // 注册事件监听
+            app.cacheEvents.on('merchantDataUpdated', this.onMerchantDataUpdated)
+            app.cacheEvents.on('cacheInvalidated', this.onCacheInvalidated)
         }
     }
 }) 

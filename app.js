@@ -25,16 +25,31 @@ App({
             data: {},
             // 缓存时间记录
             timestamps: {},
-            // 默认缓存时间（5分钟）
+            // 缓存类型映射，用于分组管理缓存
+            typeMap: {},
+            // 默认缓存时间（3分钟）
             defaultExpireTime: 3 * 60 * 1000,
+            // 最长缓存时间（10分钟，无论是否被访问）
+            maxExpireTime: 10 * 60 * 1000,
 
             // 设置缓存
-            set: function (key, value, expireTime = this.defaultExpireTime) {
+            set: function (key, value, expireTime = this.defaultExpireTime, type = null) {
+                const now = Date.now();
                 this.data[key] = value;
                 this.timestamps[key] = {
-                    time: Date.now(),
-                    expire: expireTime
+                    time: now,
+                    lastAccess: now,
+                    expire: expireTime,
+                    maxExpire: now + this.maxExpireTime
                 };
+
+                // 如果指定了类型，添加到类型映射
+                if (type) {
+                    if (!this.typeMap[type]) {
+                        this.typeMap[type] = new Set();
+                    }
+                    this.typeMap[type].add(key);
+                }
             },
 
             // 获取缓存
@@ -43,8 +58,19 @@ App({
                 const timestamp = this.timestamps[key];
 
                 // 检查缓存是否存在且未过期
-                if (timestamp && (now - timestamp.time < timestamp.expire)) {
-                    return this.data[key];
+                if (timestamp) {
+                    // 检查是否超过最大缓存时间
+                    if (now > timestamp.maxExpire) {
+                        this.remove(key);
+                        return null;
+                    }
+
+                    // 检查是否在过期时间内
+                    if (now - timestamp.time < timestamp.expire) {
+                        // 更新最后访问时间
+                        timestamp.lastAccess = now;
+                        return this.data[key];
+                    }
                 }
 
                 // 缓存不存在或已过期
@@ -53,6 +79,13 @@ App({
 
             // 清除指定缓存
             remove: function (key) {
+                // 从类型映射中移除
+                for (const type in this.typeMap) {
+                    if (this.typeMap[type].has(key)) {
+                        this.typeMap[type].delete(key);
+                    }
+                }
+
                 delete this.data[key];
                 delete this.timestamps[key];
             },
@@ -61,6 +94,7 @@ App({
             clear: function () {
                 this.data = {};
                 this.timestamps = {};
+                this.typeMap = {};
             },
 
             // 清除过期缓存
@@ -68,17 +102,118 @@ App({
                 const now = Date.now();
                 for (const key in this.timestamps) {
                     const timestamp = this.timestamps[key];
-                    if (now - timestamp.time >= timestamp.expire) {
+                    if (now - timestamp.time >= timestamp.expire || now > timestamp.maxExpire) {
                         this.remove(key);
                     }
+                }
+            },
+
+            // 按前缀使缓存失效
+            invalidateByPrefix: function (prefix) {
+                const keysToRemove = [];
+                for (const key in this.data) {
+                    if (key.startsWith(prefix)) {
+                        keysToRemove.push(key);
+                    }
+                }
+
+                keysToRemove.forEach(key => this.remove(key));
+                return keysToRemove.length;
+            },
+
+            // 按类型使缓存失效
+            invalidateByType: function (type) {
+                if (!this.typeMap[type]) return 0;
+
+                const keys = Array.from(this.typeMap[type]);
+                keys.forEach(key => this.remove(key));
+
+                this.typeMap[type] = new Set();
+                return keys.length;
+            },
+
+            // 刷新缓存（更新时间戳但不改变数据）
+            refresh: function (key) {
+                if (this.timestamps[key]) {
+                    const now = Date.now();
+                    this.timestamps[key].time = now;
+                    this.timestamps[key].lastAccess = now;
+                    return true;
+                }
+                return false;
+            }
+        };
+
+        // 定期清理过期缓存（每5分钟）
+        setInterval(() => {
+            this.cache.clearExpired();
+        }, 5 * 60 * 1000);
+
+        // 初始化缓存事件系统
+        this.initCacheEvents();
+    },
+
+    // 初始化缓存事件系统
+    initCacheEvents: function () {
+        // 缓存事件监听器
+        this.cacheEvents = {
+            listeners: {},
+
+            // 添加事件监听器
+            on: function (event, callback) {
+                if (!this.listeners[event]) {
+                    this.listeners[event] = [];
+                }
+                this.listeners[event].push(callback);
+            },
+
+            // 触发事件
+            emit: function (event, data) {
+                if (this.listeners[event]) {
+                    this.listeners[event].forEach(callback => {
+                        try {
+                            callback(data);
+                        } catch (e) {
+                            console.error('缓存事件处理错误:', e);
+                        }
+                    });
                 }
             }
         };
 
-        // 定期清理过期缓存（每10分钟）
-        setInterval(() => {
-            this.cache.clearExpired();
-        }, 10 * 60 * 1000);
+        // 监听小程序显示事件，可用于从后台恢复时刷新数据
+        wx.onAppShow(() => {
+            console.log('小程序从后台恢复');
+            // 如果后台时间超过一定阈值，可以清除所有缓存
+            if (this.backgroundTime && (Date.now() - this.backgroundTime > 5 * 60 * 1000)) {
+                console.log('后台时间超过5分钟，清除所有缓存');
+                this.cache.clear();
+                this.cacheEvents.emit('cacheCleared', {});
+            }
+            this.backgroundTime = null;
+        });
+
+        // 监听小程序隐藏事件
+        wx.onAppHide(() => {
+            console.log('小程序进入后台');
+            this.backgroundTime = Date.now();
+        });
+    },
+
+    // 使特定类型的缓存失效
+    invalidateCache: function (type) {
+        const count = this.cache.invalidateByType(type);
+        console.log(`已使${count}个${type}类型的缓存失效`);
+        this.cacheEvents.emit('cacheInvalidated', { type });
+        return count;
+    },
+
+    // 使特定前缀的缓存失效
+    invalidateCacheByPrefix: function (prefix) {
+        const count = this.cache.invalidateByPrefix(prefix);
+        console.log(`已使${count}个以"${prefix}"为前缀的缓存失效`);
+        this.cacheEvents.emit('cacheInvalidated', { prefix });
+        return count;
     },
 
     // 全局数据

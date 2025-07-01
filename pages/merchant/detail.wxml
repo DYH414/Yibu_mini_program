@@ -69,8 +69,8 @@
       <view class="rate-stars">
         <block wx:for="{{5}}" wx:key="*this">
           <image 
-            class="rate-star-big {{item < userRating ? 'active' : ''}}" 
-            src="/images/stars/{{item < userRating ? 'star-full.png' : 'star-empty.png'}}"
+            class="rate-star-big {{item + 1 <= userRating ? 'active' : ''}}" 
+            src="/images/stars/{{item + 1 <= userRating ? 'star-full.png' : 'star-empty.png'}}"
             bindtap="submitRating"
             data-rating="{{item + 1}}"
             hover-class="rate-star-hover">
