@@ -9,6 +9,9 @@ App({
                 env: 'cloudbase-0gdnnqax782f54fa', // 云环境ID，已更新为实际环境ID
                 traceUser: true,
             })
+
+            // 临时注释掉，等待云函数依赖问题解决后再启用
+            // this.initDataCache()
         }
 
         // 获取用户信息
@@ -448,5 +451,19 @@ App({
                 });
             }
         });
+    },
+
+    // 初始化数据库缓存集合
+    initDataCache: function () {
+        // 调用云函数初始化dataCache集合和TTL索引
+        wx.cloud.callFunction({
+            name: 'initDataCache',
+            success: res => {
+                console.log('初始化dataCache成功:', res.result)
+            },
+            fail: err => {
+                console.error('初始化dataCache失败:', err)
+            }
+        })
     }
 }) 

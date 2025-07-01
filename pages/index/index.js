@@ -28,7 +28,9 @@ Page({
         hasMore: true,
         showSearchHistory: false, // 是否显示搜索历史
         scrollPosition: 0, // 保存滚动位置
-        isLoadingMore: false // 是否正在加载更多数据
+        isLoadingMore: false, // 是否正在加载更多数据
+        totalPages: 1,
+        total: 0
     },
 
     onLoad: function (options) {
@@ -233,63 +235,68 @@ Page({
         }
 
         // 构建缓存键
-        const cacheKey = `merchants_${this.data.currentCategory}_${this.data.sortBy}_${this.data.page}_v3`;
+        const cacheKey = `merchants_${this.data.currentCategory}_${this.data.sortBy}_${this.data.page}_v4`;
 
         // 尝试从缓存获取数据
         if (!this.data.isRefreshing && this.data.page === 1) {
             const cachedData = app.cache.get(cacheKey);
             if (cachedData) {
-                console.log('使用缓存数据:', cacheKey);
+                console.log('使用本地缓存数据:', cacheKey);
                 this.setData({
-                    merchants: cachedData,
-                    originalMerchants: cachedData,
+                    merchants: cachedData.merchants,
+                    originalMerchants: cachedData.merchants,
                     loading: false,
                     isRefreshing: false,
                     isLoadingMore: false,
-                    hasMore: cachedData.length === this.data.pageSize
+                    hasMore: cachedData.hasMore,
+                    totalPages: cachedData.totalPages || 1,
+                    total: cachedData.total || 0
                 });
                 return;
             }
         }
 
-        // 使用云函数获取所有商家数据并在客户端排序
-        // 这样可以确保评分排序是全局的，而不是分页块内的
+        // 使用优化后的云函数获取商家数据，支持分页
         wx.cloud.callFunction({
             name: 'getAllMerchants',
             data: {
                 category: this.data.currentCategory,
-                sortBy: this.data.sortBy
+                sortBy: this.data.sortBy,
+                page: this.data.page,
+                pageSize: this.data.pageSize,
+                useCache: true // 使用云端缓存
             }
         }).then(res => {
             if (res.result && res.result.success) {
-                const allMerchants = res.result.data.merchants;
-                console.log('获取到所有商家数据:', allMerchants.length, '条');
+                const data = res.result.data;
+                const merchants = data.merchants || [];
+                console.log('获取到商家数据:', merchants.length, '条，总数:', data.total, '页码:', data.page, '总页数:', data.totalPages);
 
                 // 如果没有数据，直接更新状态并结束刷新
-                if (allMerchants.length === 0) {
+                if (merchants.length === 0) {
                     this.setData({
                         loading: false,
                         isRefreshing: false,
                         isLoadingMore: false,
-                        hasMore: false
+                        hasMore: false,
+                        totalPages: data.totalPages || 1,
+                        total: data.total || 0
                     });
                     wx.stopPullDownRefresh();
                     return;
                 }
 
                 // 为每个商家生成星星数组
-                allMerchants.forEach(merchant => {
+                merchants.forEach(merchant => {
                     merchant.starArray = this.generateStarArray(merchant.avgRating);
                 });
 
-                // 根据当前页码和页面大小进行分页
-                const startIndex = (this.data.page - 1) * this.data.pageSize;
-                const endIndex = startIndex + this.data.pageSize;
-                const currentPageMerchants = allMerchants.slice(startIndex, endIndex);
-
                 // 合并现有数据和新数据
                 const currentMerchants = this.data.page === 1 ? [] : this.data.merchants;
-                const newMerchants = [...currentMerchants, ...currentPageMerchants];
+                const newMerchants = [...currentMerchants, ...merchants];
+
+                // 计算是否还有更多数据
+                const hasMore = data.page < data.totalPages;
 
                 // 更新数据
                 this.setData({
@@ -298,12 +305,19 @@ Page({
                     loading: false,
                     isRefreshing: false,
                     isLoadingMore: false,
-                    hasMore: endIndex < allMerchants.length
+                    hasMore: hasMore,
+                    totalPages: data.totalPages || 1,
+                    total: data.total || 0
                 });
 
                 // 如果是第一页，缓存结果
                 if (this.data.page === 1) {
-                    app.cache.set(cacheKey, newMerchants);
+                    app.cache.set(cacheKey, {
+                        merchants: newMerchants,
+                        hasMore: hasMore,
+                        totalPages: data.totalPages || 1,
+                        total: data.total || 0
+                    }, 5 * 60 * 1000, 'merchants');
                 }
 
                 // 如果是加载更多，恢复滚动位置
@@ -321,6 +335,9 @@ Page({
                     isLoadingMore: false
                 });
                 wx.stopPullDownRefresh();
+
+                // 如果云函数调用失败，回退到原来的分页加载方式
+                this.loadMerchantsWithPagination();
             }
         }).catch(err => {
             console.error('调用云函数失败:', err);
