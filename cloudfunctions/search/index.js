@@ -92,6 +92,15 @@ exports.main = async (event, context) => {
 
         const favorites = favoritesResult.data
 
+        // 6.1 获取点击量数据
+        const clicksResult = await db.collection('merchantClicks')
+            .where({
+                merchantId: _.in(merchantIds)
+            })
+            .get()
+
+        const clicks = clicksResult.data
+
         // 7. 处理数据，计算评分、评论数和收藏数
         const merchantsWithData = merchants.map(merchant => {
             // 处理评分
@@ -112,12 +121,17 @@ exports.main = async (event, context) => {
             const merchantFavorites = favorites.filter(f => f.merchantId === merchant._id)
             const favoritesCount = merchantFavorites.length
 
+            // 处理点击量
+            const merchantClick = clicks.find(c => c.merchantId === merchant._id)
+            const totalClicks = merchantClick ? (merchantClick.totalClicks || 0) : 0
+
             return {
                 ...merchant,
                 avgRating,
                 ratingCount,
                 commentsCount,
-                favoritesCount
+                favoritesCount,
+                totalClicks
             }
         })
 
@@ -140,6 +154,18 @@ exports.main = async (event, context) => {
                 // 评分相同时，按评分数量排序（降序）
                 return (b.ratingCount || 0) - (a.ratingCount || 0);
             });
+        } else if (sortBy === 'clicks') {
+            // 确保将totalClicks转换为数字后再排序
+            sortedMerchants.forEach(merchant => {
+                merchant.totalClicks = parseInt(merchant.totalClicks || 0);
+            });
+
+            // 按点击量排序（降序）
+            sortedMerchants.sort((a, b) => {
+                return (b.totalClicks || 0) - (a.totalClicks || 0);
+            });
+
+            console.log('热度排序结果:', sortedMerchants.map(m => ({ name: m.name, totalClicks: m.totalClicks })));
         } else if (sortBy === 'default') {
             // 默认排序 - 使用综合排序算法
             sortedMerchants.sort((a, b) => {
@@ -182,11 +208,13 @@ function calculateCompositeScore(merchant) {
     const avgRating = parseFloat(merchant.avgRating || 0)
     const commentsCount = merchant.commentsCount || 0
     const favoritesCount = merchant.favoritesCount || 0
+    const totalClicks = merchant.totalClicks || 0
 
-    // 计算综合分数: 评分占50%，评论数占30%，收藏数占20%
-    const score = avgRating * 0.5 +
-        (Math.log(commentsCount + 1) * 0.3) +
-        (Math.log(favoritesCount + 1) * 0.2)
+    // 计算综合分数: 评分占40%，评论数占25%，收藏数占20%，点击量占15%
+    const score = avgRating * 0.4 +
+        (Math.log(commentsCount + 1) * 0.25) +
+        (Math.log(favoritesCount + 1) * 0.2) +
+        (Math.log(totalClicks + 1) * 0.15)
 
     // 如果是推荐商家，增加权重
     if (merchant.isFeatured) {

@@ -21,7 +21,7 @@ exports.main = async (event, context) => {
 
     try {
         // 构建缓存键
-        const cacheKey = `merchants_${category || 'all'}_${sortBy}_${page}_${pageSize}`
+        const cacheKey = `merchants_${category || 'all'}_${sortBy}_${page}_${pageSize}_v2` // 更新缓存版本
 
         // 如果允许使用缓存，尝试从云数据库缓存集合获取
         if (useCache) {
@@ -77,19 +77,14 @@ exports.main = async (event, context) => {
 
         // 验证页码是否有效
         const validPage = Math.min(Math.max(1, page), totalPages)
-        const skip = (validPage - 1) * pageSize
 
-        // 3. 获取当前页的商家数据
-        const merchantsResult = await db.collection('merchants')
-            .where(query)
-            .skip(skip)
-            .limit(pageSize)
-            .get()
-
-        const merchants = merchantsResult.data
+        // 3. 获取所有符合条件的商家数据（不分页）
+        // 注意：如果数据量很大，这里需要使用云函数的聚合查询功能或批量查询
+        const allMerchants = await batchGetAllMerchants(query)
+        console.log(`获取到所有符合条件的商家: ${allMerchants.length}个`)
 
         // 如果没有商家数据，直接返回
-        if (!merchants || merchants.length === 0) {
+        if (!allMerchants || allMerchants.length === 0) {
             return {
                 success: true,
                 data: {
@@ -102,74 +97,50 @@ exports.main = async (event, context) => {
             }
         }
 
-        // 获取商家ID列表
-        const merchantIds = merchants.map(m => m._id)
+        // 获取所有商家ID列表
+        const allMerchantIds = allMerchants.map(m => m._id)
 
         // 4. 并行获取这些商家的评分、评论、收藏和点击量数据
         const [ratingsResult, commentsResult, favoritesResult, clicksResult] = await Promise.all([
-            // 获取评分数据 - 只获取当前页面商家的评分
-            db.collection('ratings')
-                .where({
-                    merchantId: _.in(merchantIds)
-                })
-                .get(),
+            // 获取评分数据
+            batchGetCollectionData('ratings', { merchantId: _.in(allMerchantIds) }),
 
-            // 获取评论数据 - 只获取当前页面商家的评论数量
+            // 获取评论数据
             db.collection('comments')
-                .where({
-                    merchantId: _.in(merchantIds)
+                .aggregate()
+                .match({
+                    merchantId: _.in(allMerchantIds)
                 })
-                .count(),
+                .group({
+                    _id: '$merchantId',
+                    count: $.sum(1)
+                })
+                .end(),
 
-            // 获取收藏数据 - 只获取当前页面商家的收藏数量
+            // 获取收藏数据
             db.collection('favorites')
-                .where({
-                    merchantId: _.in(merchantIds)
+                .aggregate()
+                .match({
+                    merchantId: _.in(allMerchantIds)
                 })
-                .count(),
+                .group({
+                    _id: '$merchantId',
+                    count: $.sum(1)
+                })
+                .end(),
 
-            // 获取点击量数据 - 只获取当前页面商家的点击量
-            db.collection('merchantClicks')
-                .where({
-                    merchantId: _.in(merchantIds)
-                })
-                .get()
+            // 获取点击量数据
+            batchGetCollectionData('merchantClicks', { merchantId: _.in(allMerchantIds) })
         ])
 
-        // 5. 使用聚合查询获取每个商家的评论和收藏数量
-        const commentsCountByMerchant = await db.collection('comments')
-            .aggregate()
-            .match({
-                merchantId: _.in(merchantIds)
-            })
-            .group({
-                _id: '$merchantId',
-                count: $.sum(1)
-            })
-            .end()
-
-        const favoritesCountByMerchant = await db.collection('favorites')
-            .aggregate()
-            .match({
-                merchantId: _.in(merchantIds)
-            })
-            .group({
-                _id: '$merchantId',
-                count: $.sum(1)
-            })
-            .end()
-
-        // 6. 创建评分、评论数、收藏数和点击量的映射
-        const ratings = ratingsResult.data
-        const clicks = clicksResult.data
-
-        // 创建商家ID到评分、评论数、收藏数和点击量的映射
-        const ratingsMap = {}
+        // 5. 创建评分、评论数、收藏数和点击量的映射
+        const ratings = ratingsResult
         const commentsCountMap = {}
         const favoritesCountMap = {}
         const clicksMap = {}
 
-        // 处理评分数据
+        // 创建商家ID到评分的映射
+        const ratingsMap = {}
         ratings.forEach(rating => {
             if (!ratingsMap[rating.merchantId]) {
                 ratingsMap[rating.merchantId] = {
@@ -184,22 +155,22 @@ exports.main = async (event, context) => {
         })
 
         // 处理评论数量
-        commentsCountByMerchant.list.forEach(item => {
+        commentsResult.list.forEach(item => {
             commentsCountMap[item._id] = item.count
         })
 
         // 处理收藏数量
-        favoritesCountByMerchant.list.forEach(item => {
+        favoritesResult.list.forEach(item => {
             favoritesCountMap[item._id] = item.count
         })
 
         // 处理点击量
-        clicks.forEach(click => {
+        clicksResult.forEach(click => {
             clicksMap[click.merchantId] = click.totalClicks || 0
         })
 
-        // 7. 处理数据，计算评分、评论数、收藏数和点击量
-        const merchantsWithData = merchants.map(merchant => {
+        // 6. 处理数据，计算评分、评论数、收藏数和点击量
+        const merchantsWithData = allMerchants.map(merchant => {
             // 处理评分
             const merchantRating = ratingsMap[merchant._id] || { count: 0, total: 0 }
             const ratingCount = merchantRating.count
@@ -228,7 +199,7 @@ exports.main = async (event, context) => {
             }
         })
 
-        // 8. 排序
+        // 7. 对所有数据进行排序，而不仅仅是当前页的数据
         let sortedMerchants = merchantsWithData
 
         if (sortBy === 'rating') {
@@ -259,9 +230,13 @@ exports.main = async (event, context) => {
             })
         }
 
+        // 8. 在排序后再进行分页
+        const skip = (validPage - 1) * pageSize
+        const pagedMerchants = sortedMerchants.slice(skip, skip + pageSize)
+
         // 9. 构建返回数据
         const result = {
-            merchants: sortedMerchants,
+            merchants: pagedMerchants,
             total,
             page: validPage,
             pageSize,
@@ -302,6 +277,55 @@ exports.main = async (event, context) => {
             error: error
         }
     }
+}
+
+/**
+ * 批量获取指定集合中的所有数据
+ * @param {string} collectionName - 集合名称
+ * @param {object} query - 查询条件
+ * @returns {Array} - 查询结果数组
+ */
+async function batchGetCollectionData(collectionName, query = {}) {
+    const countResult = await db.collection(collectionName).where(query).count()
+    const total = countResult.total
+
+    // 如果没有数据，直接返回空数组
+    if (total === 0) {
+        return []
+    }
+
+    // 计算需要查询的次数
+    const batchTimes = Math.ceil(total / MAX_LIMIT)
+    const tasks = []
+
+    for (let i = 0; i < batchTimes; i++) {
+        const promise = db.collection(collectionName)
+            .where(query)
+            .skip(i * MAX_LIMIT)
+            .limit(MAX_LIMIT)
+            .get()
+        tasks.push(promise)
+    }
+
+    // 等待所有请求完成
+    const results = await Promise.all(tasks)
+
+    // 将结果合并
+    let allData = []
+    results.forEach(result => {
+        allData = allData.concat(result.data)
+    })
+
+    return allData
+}
+
+/**
+ * 批量获取所有商家数据
+ * @param {object} query - 查询条件
+ * @returns {Array} - 商家数据数组
+ */
+async function batchGetAllMerchants(query = {}) {
+    return await batchGetCollectionData('merchants', query)
 }
 
 /**

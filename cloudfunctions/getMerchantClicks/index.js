@@ -10,10 +10,24 @@ const _ = db.command
 
 // 云函数入口函数
 exports.main = async (event, context) => {
-    const { merchantId, getTopMerchants = false, limit = 10 } = event
+    const { merchantId, merchantIds, getTopMerchants = false, limit = 10 } = event
 
     try {
-        if (merchantId) {
+        // 如果提供了merchantIds数组，则批量获取多个商家的点击量
+        if (merchantIds && Array.isArray(merchantIds) && merchantIds.length > 0) {
+            const result = await db.collection('merchantClicks')
+                .where({
+                    merchantId: _.in(merchantIds)
+                })
+                .get()
+
+            return {
+                success: true,
+                data: result.data,
+                message: '批量获取点击量成功'
+            }
+        }
+        else if (merchantId) {
             // 获取指定商家的点击量
             const result = await db.collection('merchantClicks').where({
                 merchantId: merchantId
@@ -35,7 +49,8 @@ exports.main = async (event, context) => {
                     message: '获取点击量成功'
                 }
             }
-        } else if (getTopMerchants) {
+        }
+        else if (getTopMerchants) {
             // 获取热门商家列表（按点击量排序）
             const clicksResult = await db.collection('merchantClicks')
                 .orderBy('totalClicks', 'desc')
@@ -78,7 +93,7 @@ exports.main = async (event, context) => {
         } else {
             return {
                 success: false,
-                message: '参数错误，请提供merchantId或设置getTopMerchants=true'
+                message: '参数错误，请提供merchantId、merchantIds数组或设置getTopMerchants=true'
             }
         }
     } catch (err) {

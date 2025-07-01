@@ -77,6 +77,18 @@ Page({
                 console.log('已清除缓存:', key);
             }
         }
+
+        // 清除云端缓存
+        wx.cloud.callFunction({
+            name: 'clearDataCache',
+            data: {
+                prefix: 'merchants_'
+            }
+        }).then(res => {
+            console.log('清除云端缓存成功:', res.result)
+        }).catch(err => {
+            console.error('清除云端缓存失败:', err)
+        })
     },
 
     /**
@@ -402,6 +414,9 @@ Page({
                     // 批量获取收藏数据
                     return this.batchGetFavorites(merchantIds, updatedMerchants);
                 }).then(updatedMerchants => {
+                    // 批量获取点击量数据
+                    return this.batchGetClicks(merchantIds, updatedMerchants);
+                }).then(updatedMerchants => {
                     // 根据排序方式进行排序
                     if (this.data.sortBy === 'rating') {
                         // 添加调试信息
@@ -432,6 +447,28 @@ Page({
                             name: m.name,
                             avgRating: m.avgRating,
                             ratingCount: m.ratingCount
+                        })));
+                    } else if (this.data.sortBy === 'clicks') {
+                        // 按点击量排序 - 使用明确的降序排序
+                        console.log('排序前商家数据(热度):', updatedMerchants.map(m => ({
+                            name: m.name,
+                            totalClicks: m.totalClicks
+                        })));
+
+                        // 确保将totalClicks转换为数字后再排序
+                        updatedMerchants.forEach(merchant => {
+                            merchant.totalClicks = parseInt(merchant.totalClicks || 0);
+                        });
+
+                        // 按点击量排序（降序）
+                        updatedMerchants.sort((a, b) => {
+                            return (b.totalClicks || 0) - (a.totalClicks || 0);
+                        });
+
+                        // 添加调试信息
+                        console.log('排序后商家数据(热度):', updatedMerchants.map(m => ({
+                            name: m.name,
+                            totalClicks: m.totalClicks
                         })));
                     } else if (this.data.sortBy === 'default') {
                         // 默认排序 - 使用综合排序算法
@@ -686,6 +723,84 @@ Page({
                     return merchant;
                 });
             });
+    },
+
+    /**
+     * 批量获取商家点击量数据
+     */
+    batchGetClicks: function (merchantIds, merchants) {
+        // 获取app实例
+        const app = getApp();
+
+        // 尝试从缓存获取点击量数据
+        const cacheKey = `clicks_count_${merchantIds.join('_')}`;
+        const cachedClicksCount = app.cache.get(cacheKey);
+
+        if (cachedClicksCount) {
+            console.log('使用缓存的点击量数据');
+            // 使用缓存的点击量更新商家信息
+            return Promise.resolve(merchants.map(merchant => {
+                merchant.totalClicks = cachedClicksCount[merchant._id] || 0;
+                return merchant;
+            }));
+        }
+
+        // 缓存不存在，从数据库获取点击量数据
+        // 使用云函数获取点击量数据
+        return wx.cloud.callFunction({
+            name: 'getMerchantClicks',
+            data: {
+                merchantIds: merchantIds
+            }
+        }).then(res => {
+            if (res.result && res.result.success) {
+                const clicksData = res.result.data || [];
+
+                // 按商家ID分组点击量数据
+                const clicksByMerchant = {};
+                clicksData.forEach(click => {
+                    clicksByMerchant[click.merchantId] = click.totalClicks || 0;
+                });
+
+                // 缓存点击量数据
+                app.cache.set(cacheKey, clicksByMerchant, 10 * 60 * 1000); // 10分钟缓存
+
+                // 更新商家信息
+                return merchants.map(merchant => {
+                    merchant.totalClicks = clicksByMerchant[merchant._id] || 0;
+                    return merchant;
+                });
+            }
+
+            // 如果云函数调用失败，回退到直接查询
+            return db.collection('merchantClicks')
+                .where({
+                    merchantId: db.command.in(merchantIds)
+                })
+                .get()
+                .then(res => {
+                    const clicks = res.data;
+
+                    // 按商家ID分组点击量数据
+                    const clicksByMerchant = {};
+                    clicks.forEach(click => {
+                        clicksByMerchant[click.merchantId] = click.totalClicks || 0;
+                    });
+
+                    // 缓存点击量数据
+                    app.cache.set(cacheKey, clicksByMerchant, 10 * 60 * 1000); // 10分钟缓存
+
+                    // 更新商家信息
+                    return merchants.map(merchant => {
+                        merchant.totalClicks = clicksByMerchant[merchant._id] || 0;
+                        return merchant;
+                    });
+                });
+        }).catch(err => {
+            console.error('获取点击量数据失败', err);
+            // 如果出错，返回原始商家数据
+            return Promise.resolve(merchants);
+        });
     },
 
     // 加载更多商家数据
