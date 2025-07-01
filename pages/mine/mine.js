@@ -18,10 +18,11 @@ Page({
     },
 
     onLoad: function (options) {
+        // 获取登录状态
         this.checkLoginStatus()
 
-        // 清理所有用户的重复收藏记录
-        this.cleanAllDuplicates()
+        // 设置缓存事件监听
+        this.setupCacheEventListeners()
     },
 
     onShow: function () {
@@ -47,6 +48,57 @@ Page({
 
             // 加载用户数据
             this.loadUserData()
+        }
+    },
+
+    onUnload: function () {
+        // 页面卸载时移除事件监听
+        const app = getApp()
+        if (app.cacheEvents && app.cacheEvents.listeners) {
+            // 移除事件监听器的引用
+            if (this.onFavoriteUpdated) {
+                app.cacheEvents.listeners['favoriteUpdated'] =
+                    app.cacheEvents.listeners['favoriteUpdated']?.filter(
+                        listener => listener !== this.onFavoriteUpdated
+                    )
+            }
+
+            if (this.onCacheInvalidated) {
+                app.cacheEvents.listeners['cacheInvalidated'] =
+                    app.cacheEvents.listeners['cacheInvalidated']?.filter(
+                        listener => listener !== this.onCacheInvalidated
+                    )
+            }
+        }
+    },
+
+    // 设置缓存事件监听
+    setupCacheEventListeners: function () {
+        const app = getApp()
+        if (app.cacheEvents) {
+            // 收藏更新事件
+            this.onFavoriteUpdated = (data) => {
+                console.log('收到收藏更新事件:', data)
+                // 如果当前标签页是收藏，则刷新数据
+                if (this.data.activeTab === 'favorites' && this.data.isLogin) {
+                    this.loadFavorites()
+                }
+            }
+
+            // 缓存失效事件
+            this.onCacheInvalidated = (data) => {
+                console.log('收到缓存失效事件:', data)
+                // 如果是user_favorites_前缀的缓存被失效，刷新收藏列表
+                if (data.prefix && data.prefix.startsWith('user_favorites_')) {
+                    if (this.data.activeTab === 'favorites' && this.data.isLogin) {
+                        this.loadFavorites()
+                    }
+                }
+            }
+
+            // 注册事件监听
+            app.cacheEvents.on('favoriteUpdated', this.onFavoriteUpdated)
+            app.cacheEvents.on('cacheInvalidated', this.onCacheInvalidated)
         }
     },
 
@@ -431,14 +483,31 @@ Page({
 
         if (index === -1) return
 
+        const favorite = this.data.favorites[index]
+        if (!favorite || !favorite.merchantId) {
+            wx.showToast({
+                title: '收藏数据有误',
+                icon: 'none'
+            })
+            return
+        }
+
         wx.showLoading({
             title: '处理中',
             mask: true
         })
 
-        db.collection('favorites').doc(id).remove()
-            .then(() => {
-                wx.hideLoading()
+        // 使用云函数处理取消收藏操作，而不是直接操作数据库
+        wx.cloud.callFunction({
+            name: 'manageFavorite',
+            data: {
+                action: 'removeByMerchant',
+                merchantId: favorite.merchantId
+            }
+        }).then(res => {
+            wx.hideLoading()
+
+            if (res.result && res.result.success) {
                 wx.showToast({
                     title: '已取消收藏',
                     icon: 'success'
@@ -452,15 +521,32 @@ Page({
                     favorites: favorites,
                     favoriteCount: Math.max(0, this.data.favoriteCount - 1)
                 })
-            })
-            .catch(err => {
-                wx.hideLoading()
-                console.error('取消收藏失败', err)
+
+                // 更新缓存
+                const app = getApp()
+                app.invalidateCacheByPrefix(`user_favorites_`)
+                app.invalidateCacheByPrefix(`merchant_detail_`)
+
+                // 通知其他页面可能需要刷新
+                app.cacheEvents.emit('favoriteUpdated', {
+                    merchantId: favorite.merchantId,
+                    action: 'remove'
+                })
+            } else {
+                console.error('取消收藏失败:', res.result)
                 wx.showToast({
-                    title: '操作失败，请重试',
+                    title: res.result?.message || '操作失败，请重试',
                     icon: 'none'
                 })
+            }
+        }).catch(err => {
+            wx.hideLoading()
+            console.error('取消收藏失败', err)
+            wx.showToast({
+                title: '操作失败，请重试',
+                icon: 'none'
             })
+        })
     },
 
     // 清理所有用户的重复收藏记录

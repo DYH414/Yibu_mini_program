@@ -510,6 +510,17 @@ Page({
         // 使首页商家列表缓存失效
         app.invalidateCacheByPrefix('merchants_')
 
+        // 如果是收藏操作，使用户收藏列表缓存失效
+        if (type === 'favorite') {
+            app.invalidateCacheByPrefix('user_favorites_')
+
+            // 发出收藏更新事件
+            app.cacheEvents.emit('favoriteUpdated', {
+                merchantId: this.data.merchantId,
+                action: this.data.isFavorite ? 'add' : 'remove'
+            })
+        }
+
         // 通知其他页面可能需要刷新
         app.cacheEvents.emit('merchantDataUpdated', {
             merchantId: this.data.merchantId,
