@@ -334,33 +334,34 @@ Page({
     checkFavoriteStatus: function () {
         if (!this.data.isLogin) return
 
-        db.collection('favorites')
-            .where({
-                merchantId: this.data.merchantId,
-                userOpenId: this.data.userOpenid
-            })
-            .get()
-            .then(res => {
+        // 使用云函数检查收藏状态，确保与添加/删除收藏操作保持一致
+        wx.cloud.callFunction({
+            name: 'manageFavorite',
+            data: {
+                action: 'check',
+                merchantId: this.data.merchantId
+            }
+        }).then(res => {
+            if (res.result && res.result.success) {
                 // 设置收藏状态
-                const isFavorite = res.data && res.data.length > 0
-                this.setData({ isFavorite: isFavorite })
+                this.setData({
+                    isFavorite: res.result.isFavorite
+                })
 
-                // 如果发现重复收藏记录，使用云函数清理
-                if (res.data && res.data.length > 1) {
-                    console.log(`发现重复收藏记录，调用云函数清理`)
-
-                    // 调用云函数清理重复收藏
-                    wx.cloud.callFunction({
-                        name: 'cleanAllDuplicates',
-                        success: res => {
-                            console.log('清理重复收藏成功:', res.result)
-                        },
-                        fail: err => {
-                            console.error('清理重复收藏失败:', err)
-                        }
-                    })
+                // 更新缓存
+                const app = getApp()
+                const cacheKey = `merchant_detail_cloud_${this.data.merchantId}`
+                const cachedData = app.cache.get(cacheKey)
+                if (cachedData) {
+                    cachedData.isFavorite = res.result.isFavorite
+                    app.cache.set(cacheKey, cachedData)
                 }
-            })
+            } else {
+                console.error('检查收藏状态失败:', res)
+            }
+        }).catch(err => {
+            console.error('调用云函数检查收藏状态失败:', err)
+        })
     },
 
     // 提交评分
@@ -454,97 +455,58 @@ Page({
 
         const isFavorite = this.data.isFavorite
 
-        if (isFavorite) {
-            // 取消收藏 - 使用云函数清理所有收藏记录后再检查状态
-            wx.cloud.callFunction({
-                name: 'cleanAllDuplicates',
-                success: () => {
-                    // 清理完成后再删除收藏
-                    db.collection('favorites')
-                        .where({
-                            merchantId: this.data.merchantId,
-                            userOpenId: this.data.userOpenid
-                        })
-                        .get()
-                        .then(res => {
-                            if (res.data && res.data.length > 0) {
-                                // 删除找到的收藏记录
-                                return db.collection('favorites').doc(res.data[0]._id).remove()
-                            }
-                            return Promise.reject('未找到收藏记录')
-                        })
-                        .then(() => {
-                            this.setData({ isFavorite: false })
-                            wx.showToast({
-                                title: '已取消收藏',
-                                icon: 'success'
-                            })
-                        })
-                        .catch(err => {
-                            if (err === '未找到收藏记录') {
-                                this.setData({ isFavorite: false })
-                                return
-                            }
-                            console.error('取消收藏失败', err)
-                            wx.showToast({
-                                title: '操作失败',
-                                icon: 'none'
-                            })
-                        })
-                },
-                fail: err => {
-                    console.error('清理收藏记录失败:', err)
-                    wx.showToast({
-                        title: '操作失败',
-                        icon: 'none'
-                    })
-                }
-            })
-        } else {
-            // 添加收藏前先检查是否已经收藏过
-            db.collection('favorites')
-                .where({
-                    merchantId: this.data.merchantId,
-                    userOpenId: this.data.userOpenid
-                })
-                .get()
-                .then(res => {
-                    if (res.data && res.data.length > 0) {
-                        // 已经收藏过，不重复添加
-                        console.log('该商家已经收藏过了')
-                        this.setData({ isFavorite: true })
-                        wx.showToast({
-                            title: '已收藏',
-                            icon: 'success'
-                        })
-                        return Promise.reject('已收藏')
-                    }
+        // 显示加载中提示
+        wx.showLoading({
+            title: isFavorite ? '取消收藏中...' : '收藏中...',
+            mask: true
+        })
 
-                    // 没有收藏记录，添加新收藏
-                    return db.collection('favorites').add({
-                        data: {
-                            merchantId: this.data.merchantId,
-                            userOpenId: this.data.userOpenid,
-                            timestamp: db.serverDate()
-                        }
-                    })
+        // 使用云函数处理收藏/取消收藏操作，确保原子性
+        wx.cloud.callFunction({
+            name: 'manageFavorite',
+            data: {
+                action: isFavorite ? 'removeByMerchant' : 'add',
+                merchantId: this.data.merchantId
+            }
+        }).then(res => {
+            wx.hideLoading()
+
+            if (res.result && res.result.success) {
+                // 更新收藏状态
+                this.setData({
+                    isFavorite: !isFavorite
                 })
-                .then(() => {
-                    this.setData({ isFavorite: true })
-                    wx.showToast({
-                        title: '收藏成功',
-                        icon: 'success'
-                    })
+
+                // 显示操作结果
+                wx.showToast({
+                    title: isFavorite ? '已取消收藏' : '收藏成功',
+                    icon: 'success'
                 })
-                .catch(err => {
-                    if (err === '已收藏') return
-                    console.error('收藏失败', err)
-                    wx.showToast({
-                        title: '操作失败',
-                        icon: 'none'
-                    })
+
+                // 更新缓存中的商家详情数据
+                const app = getApp()
+                const cacheKey = `merchant_detail_cloud_${this.data.merchantId}`
+                const cachedData = app.cache.get(cacheKey)
+                if (cachedData) {
+                    cachedData.isFavorite = !isFavorite
+                    app.cache.set(cacheKey, cachedData)
+                }
+            } else {
+                // 操作失败
+                console.error('收藏操作失败:', res)
+                wx.showToast({
+                    title: res.result.message || '操作失败',
+                    icon: 'none'
                 })
-        }
+            }
+        }).catch(err => {
+            wx.hideLoading()
+            console.error('调用云函数失败:', err)
+            wx.showToast({
+                title: '操作失败，请重试',
+                icon: 'none'
+            })
+        })
     },
 
     // 跳转到平台小程序

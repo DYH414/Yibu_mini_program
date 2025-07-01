@@ -2,7 +2,7 @@
 const cloud = require('wx-server-sdk')
 
 cloud.init({
-    env: 'cloudbase-0gdnnqax782f54fa' // 云环境ID
+    env: cloud.DYNAMIC_CURRENT_ENV // 使用动态当前环境，而不是硬编码环境ID
 })
 
 const db = cloud.database()
@@ -33,11 +33,14 @@ exports.main = async (event, context) => {
                 merchantId: merchantId
             }).get(),
 
-            // 3. 获取当前用户是否已收藏
-            userOpenId ? db.collection('favorites').where({
-                merchantId: merchantId,
-                userOpenId: userOpenId
-            }).count() : { total: 0 }
+            // 3. 使用manageFavorite云函数检查收藏状态
+            userOpenId ? cloud.callFunction({
+                name: 'manageFavorite',
+                data: {
+                    action: 'check',
+                    merchantId: merchantId
+                }
+            }) : { result: { isFavorite: false } }
         ])
 
         // 处理商家数据
@@ -61,7 +64,8 @@ exports.main = async (event, context) => {
         }
 
         // 处理收藏状态
-        const isFavorite = favoriteResult.total > 0
+        const isFavorite = favoriteResult.result && favoriteResult.result.success ?
+            favoriteResult.result.isFavorite : false
 
         // 返回完整数据
         return {
