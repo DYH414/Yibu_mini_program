@@ -1,9 +1,32 @@
 <!-- index.wxml -->
 <view class="container">
-  <!-- 刷新状态指示器 -->
-  <view class="refresh-indicator" wx:if="{{isRefreshing}}">
-    <view class="refresh-loading"></view>
-    <text class="refresh-text">正在刷新...</text>
+
+
+  <!-- 公告栏 -->
+  
+  <view class="announcement-container" wx:if="{{showAnnouncement && announcements.length > 0}}">
+    <view class="announcement-wrapper">
+      <view class="announcement-icon">
+        <text class="iconfont icon-notice"></text>
+      </view>
+      <view class="announcement-content" bindtap="onAnnouncementTap">
+        <view class="announcement-text">
+          <text class="announcement-title">{{announcements[currentAnnouncementIndex].title}}</text>
+          <text class="announcement-desc">{{announcements[currentAnnouncementIndex].content}}</text>
+        </view>
+      </view>
+      <view class="announcement-close" bindtap="closeAnnouncement">
+        <text class="iconfont icon-close">×</text>
+      </view>
+    </view>
+    <!-- 公告指示器 -->
+    <view class="announcement-dots" wx:if="{{announcements.length > 1}}">
+      <view 
+        class="dot {{index === currentAnnouncementIndex ? 'active' : ''}}" 
+        wx:for="{{announcements}}" 
+        wx:key="_id">
+      </view>
+    </view>
   </view>
 
   <!-- 搜索栏 -->

@@ -30,12 +30,16 @@ Page({
         scrollPosition: 0, // 保存滚动位置
         isLoadingMore: false, // 是否正在加载更多数据
         totalPages: 1,
-        total: 0
+        total: 0,
+        announcements: [], // 公告列表
+        currentAnnouncementIndex: 0, // 当前显示的公告索引
+        showAnnouncement: true // 是否显示公告
     },
 
     onLoad: function (options) {
         // 清除缓存，确保使用最新排序逻辑
         this.clearMerchantCache()
+        this.loadAnnouncements()
         this.loadMerchants()
 
         // 监听缓存事件，当商家数据更新时刷新列表
@@ -56,6 +60,112 @@ Page({
                 app.cacheEvents.listeners['cacheInvalidated']?.filter(
                     listener => listener !== this.onCacheInvalidated
                 )
+        }
+    },
+
+    // 加载公告数据
+    loadAnnouncements: function () {
+        console.log('开始加载公告数据...')
+        wx.cloud.callFunction({
+            name: 'getAnnouncements',
+            data: {
+                limit: 5,
+                isActive: true
+            }
+        }).then(res => {
+            console.log('云函数调用成功，响应:', res)
+            if (res.result && res.result.success) {
+                console.log('获取到公告数据:', res.result.data)
+                this.setData({
+                    announcements: res.result.data
+                })
+
+                // 如果有公告，启动自动切换
+                if (res.result.data.length > 1) {
+                    this.startAnnouncementTimer()
+                    console.log('启动公告自动切换定时器')
+                }
+
+                if (res.result.data.length === 0) {
+                    console.log('数据库中没有有效的公告数据')
+                }
+            } else {
+                console.error('云函数返回失败:', res.result)
+            }
+        }).catch(err => {
+            console.error('加载公告失败:', err)
+        })
+    },
+
+
+
+    // 启动公告自动切换定时器
+    startAnnouncementTimer: function () {
+        if (this.announcementTimer) {
+            clearInterval(this.announcementTimer)
+        }
+
+        this.announcementTimer = setInterval(() => {
+            if (this.data.announcements.length > 1) {
+                const nextIndex = (this.data.currentAnnouncementIndex + 1) % this.data.announcements.length
+                this.setData({
+                    currentAnnouncementIndex: nextIndex
+                })
+            }
+        }, 3000) // 每3秒切换一次
+    },
+
+    // 点击公告处理
+    onAnnouncementTap: function (e) {
+        const announcement = this.data.announcements[this.data.currentAnnouncementIndex]
+        if (!announcement) return
+
+        // 更新浏览量
+        wx.cloud.callFunction({
+            name: 'updateAnnouncementView',
+            data: {
+                announcementId: announcement._id
+            }
+        })
+
+        // 如果有链接，跳转到链接
+        if (announcement.linkUrl) {
+            if (announcement.linkUrl.startsWith('http')) {
+                // 外部链接
+                wx.copyData({
+                    data: announcement.linkUrl,
+                    success: () => {
+                        wx.showToast({
+                            title: '链接已复制',
+                            icon: 'success'
+                        })
+                    }
+                })
+            } else {
+                // 内部页面链接
+                wx.navigateTo({
+                    url: announcement.linkUrl
+                })
+            }
+        } else {
+            // 显示公告详情
+            wx.showModal({
+                title: announcement.title,
+                content: announcement.content,
+                showCancel: false,
+                confirmText: '知道了'
+            })
+        }
+    },
+
+    // 关闭公告
+    closeAnnouncement: function () {
+        this.setData({
+            showAnnouncement: false
+        })
+
+        if (this.announcementTimer) {
+            clearInterval(this.announcementTimer)
         }
     },
 

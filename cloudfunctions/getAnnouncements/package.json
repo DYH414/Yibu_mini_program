@@ -1,0 +1,9 @@
+{
+  "name": "getAnnouncements",
+  "version": "1.0.0",
+  "description": "获取公告列表云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.4.0"
+  }
+}
