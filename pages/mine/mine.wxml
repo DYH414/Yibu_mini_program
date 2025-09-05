@@ -130,6 +130,10 @@
       <view class="action-icon about-icon"></view>
       <text>关于我们</text>
     </view>
+    <view class="action-item" hover-class="action-hover" bindtap="showVersionInfo">
+      <view class="action-icon version-icon"></view>
+      <text>版本信息</text>
+    </view>
     <view class="action-item" hover-class="action-hover" bindtap="contactService">
       <view class="action-icon service-icon"></view>
       <text>联系客服</text>
@@ -169,6 +173,44 @@
       </view>
       
       <view class="contact-close" bindtap="hideContactModal">
+        <view class="close-icon"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 版本信息弹窗 -->
+  <view class="version-modal-mask" wx:if="{{showVersionModal}}" bindtap="hideVersionModal">
+    <view class="version-modal" catchtap="stopPropagation">
+      <view class="version-modal-header">
+        <view class="version-logo">
+          <image src="/images/logo.png" mode="aspectFit"></image>
+        </view>
+        <view class="version-title">{{versionInfo.description}}</view>
+        <view class="version-number">v{{versionInfo.version}}</view>
+      </view>
+      
+      <view class="version-content">
+        <view class="version-info">
+          <view class="version-date">发布日期：{{versionInfo.releaseDate}}</view>
+          <view class="version-features">
+            <view class="features-title">主要功能：</view>
+            <view class="feature-list">
+              <view class="feature-item" wx:for="{{versionInfo.features}}" wx:key="index">
+                <text class="feature-dot">•</text>
+                <text class="feature-text">{{item}}</text>
+              </view>
+            </view>
+          </view>
+        </view>
+        
+        <view class="version-actions">
+          <view class="version-action-btn close-btn" bindtap="hideVersionModal" hover-class="btn-hover">
+            <text>确定</text>
+          </view>
+        </view>
+      </view>
+      
+      <view class="version-close" bindtap="hideVersionModal">
         <view class="close-icon"></view>
       </view>
     </view>

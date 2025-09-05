@@ -2,6 +2,7 @@
 const app = getApp()
 const db = wx.cloud.database()
 const _ = db.command
+const versionConfig = require('../../config/version.js')
 
 Page({
     data: {
@@ -14,7 +15,14 @@ Page({
         loading: true,
         activeTab: 'favorite', // 当前激活的标签页：favorite, rating
         showContactModal: false,
-        phoneNumber: '17805978513'
+        showVersionModal: false,
+        phoneNumber: '17805978513',
+        versionInfo: {
+            version: versionConfig.version,
+            description: versionConfig.description,
+            releaseDate: versionConfig.releaseDate,
+            features: versionConfig.features
+        }
     },
 
     onLoad: function (options) {
@@ -620,6 +628,20 @@ Page({
     hideContactModal: function () {
         this.setData({
             showContactModal: false
+        })
+    },
+
+    // 显示版本信息弹窗
+    showVersionInfo: function () {
+        this.setData({
+            showVersionModal: true
+        })
+    },
+
+    // 隐藏版本信息弹窗
+    hideVersionModal: function () {
+        this.setData({
+            showVersionModal: false
         })
     },
 
