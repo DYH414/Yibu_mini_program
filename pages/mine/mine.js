@@ -16,6 +16,7 @@ Page({
         activeTab: 'favorite', // 当前激活的标签页：favorite, rating
         showContactModal: false,
         showVersionModal: false,
+        showAboutModal: false,
         phoneNumber: '17805978513',
         versionInfo: {
             version: versionConfig.version,
@@ -628,6 +629,20 @@ Page({
     hideContactModal: function () {
         this.setData({
             showContactModal: false
+        })
+    },
+
+    // 显示关于我们弹窗
+    showAboutModal: function () {
+        this.setData({
+            showAboutModal: true
+        })
+    },
+
+    // 隐藏关于我们弹窗
+    hideAboutModal: function () {
+        this.setData({
+            showAboutModal: false
         })
     },
 

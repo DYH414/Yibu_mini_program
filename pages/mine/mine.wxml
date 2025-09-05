@@ -124,9 +124,9 @@
     </view>
   </block>
 
-  <!-- 其他操作 -->
-  <view class="action-list card" wx:if="{{isLogin}}">
-    <view class="action-item" hover-class="action-hover">
+  <!-- 通用操作 -->
+  <view class="action-list card">
+    <view class="action-item" hover-class="action-hover" bindtap="showAboutModal">
       <view class="action-icon about-icon"></view>
       <text>关于我们</text>
     </view>
@@ -138,7 +138,7 @@
       <view class="action-icon service-icon"></view>
       <text>联系客服</text>
     </view>
-    <view class="action-item logout" bindtap="logout" hover-class="logout-hover">
+    <view class="action-item logout" wx:if="{{isLogin}}" bindtap="logout" hover-class="logout-hover">
       <text>退出登录</text>
     </view>
   </view>
@@ -173,6 +173,53 @@
       </view>
       
       <view class="contact-close" bindtap="hideContactModal">
+        <view class="close-icon"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 关于我们弹窗 -->
+  <view class="about-modal-mask" wx:if="{{showAboutModal}}" bindtap="hideAboutModal">
+    <view class="about-modal" catchtap="stopPropagation">
+      <view class="about-modal-header">
+        <view class="about-logo">
+          <image src="/images/logo.png" mode="aspectFit"></image>
+        </view>
+        <view class="about-title">关于我们</view>
+        <view class="about-subtitle">一布外卖</view>
+      </view>
+      
+      <view class="about-content">
+        <view class="about-text">
+          <view class="greeting">大家好！我是河南工学院软件工程专业的大三学生。</view>
+          
+          <view class="description">
+            这个小程序从设计、开发到日常维护，都是由我独立完成的。
+          </view>
+          
+          <view class="purpose">
+            做它的初衷很简单：让同学们点外卖更方便，不用再在不同地方来回找。
+            目前平台已经接入了校内外多家优质商家，后续还会不断更新和优化。
+          </view>
+          
+          <view class="feedback">
+            如果你在使用过程中有任何问题或建议，欢迎告诉我～
+            感谢每一位支持「一布外卖」的同学！
+          </view>
+          
+          <view class="contact">
+            👉 合作或联系请加微信：d17805978513
+          </view>
+        </view>
+        
+        <view class="about-actions">
+          <view class="about-action-btn close-btn" bindtap="hideAboutModal" hover-class="btn-hover">
+            <text>确定</text>
+          </view>
+        </view>
+      </view>
+      
+      <view class="about-close" bindtap="hideAboutModal">
         <view class="close-icon"></view>
       </view>
     </view>
